@@ -1,0 +1,48 @@
+{
+  "name": "bugproof",
+  "version": "0.0.1",
+  "description": "Executable bug artifacts — portable, reproducible bug reports",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write 'src/**/*.ts'",
+    "cli": "tsx src/cli.ts",
+    "prepare": "husky install 2>/dev/null || true"
+  },
+  "keywords": [
+    "bug",
+    "reproducible",
+    "artifact",
+    "cli",
+    "debugging",
+    "issue-tracking",
+    "portable"
+  ],
+  "author": "BugProof Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.1.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "tar": "^6.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

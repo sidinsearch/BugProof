@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gbrain": {
+      "command": "c:\\users\\siddharth\\.local\\bin\\gbrain.cmd",
+      "args": ["serve"]
+    }
+  }
+}

@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+.env.local
+.env.*.local
+.vault/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+logs/
+
+# gstack state (local only, not .gstack folder itself)
+# .gstack folder is tracked in git, contains setup scripts
+# These are runtime state files we want to exclude:
+.gstack/state/
+.gstack/.gstack/
+.gstack-worktrees/
+.claude/state/
+.agents/state/
+
+# Temp
+/tmp/
+*.tmp
+
+# Ignore executables
+*.exe
