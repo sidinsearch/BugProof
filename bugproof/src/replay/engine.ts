@@ -24,7 +24,7 @@ export interface ReplayResult {
  */
 export async function replayArtifact(runConfig: RunConfig, expectedFailure: FailureRecord, options: ReplayOptions): Promise<ReplayResult> {
   // Merge environments
-  const replayEnv = { ...process.env, ...runConfig.environment, ...options.envOverrides };
+  const replayEnv = { ...process.env, ...runConfig.environment, ...options.envOverrides } as Record<string, string>;
   
   // Re-run the command
   const replayConfig: RunConfig = {

@@ -25,8 +25,8 @@ export interface CapturedPlatformContext {
 }
 
 export interface EnvSchema {
-  required: Record<string, string>;
-  optional: Record<string, string>;
+  required: string[];
+  optional: string[];
   secrets: string[];
   captured_env_keys: string[];
 }

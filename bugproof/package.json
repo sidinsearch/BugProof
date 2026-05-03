@@ -1,9 +1,12 @@
 {
   "name": "bugproof",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Executable bug artifacts — portable, reproducible bug reports",
-  "main": "src/index.ts",
+  "main": "dist/cli.js",
   "type": "module",
+  "bin": {
+    "bugproof": "dist/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
@@ -38,8 +41,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "commander": "^11.0.0",
-    "tar": "^6.2.0"
+    "commander": "^11.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -41,7 +41,7 @@ export function scanEnvironmentForSecrets(env: NodeJS.ProcessEnv): SecretScanRes
   };
 }
 
-export function buildEnvironmentSchema(env: NodeJS.ProcessEnv, detectedSecrets: string[]): { required: string[], optional: string[], secrets: string[] } {
+export function buildEnvironmentSchema(env: NodeJS.ProcessEnv, detectedSecrets: string[]): { required: string[], optional: string[], secrets: string[], captured_env_keys: string[] } {
   // In a real scenario, we'd determine which env vars are actually required by the app.
   // For v0.1, we classify everything non-standard as 'optional' unless explicitly mapped,
   // except secrets which are separated out.
@@ -50,6 +50,7 @@ export function buildEnvironmentSchema(env: NodeJS.ProcessEnv, detectedSecrets: 
   const optional: string[] = [];
   const required: string[] = []; // We will let users specify required later, or infer
   const secrets = [...detectedSecrets];
+  const captured_env_keys = Object.keys(env);
   
   for (const key of Object.keys(env)) {
     if (standardKeys.includes(key)) continue;
@@ -57,5 +58,5 @@ export function buildEnvironmentSchema(env: NodeJS.ProcessEnv, detectedSecrets: 
     optional.push(key);
   }
   
-  return { required, optional, secrets };
+  return { required, optional, secrets, captured_env_keys };
 }
