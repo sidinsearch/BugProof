@@ -19,7 +19,8 @@ describe('Verdict Generator', () => {
       expectedFailure: baseFailure,
       actualFailure: baseFailure, // Exact same
       actualStdout: '',
-      actualStderr: ''
+      actualStderr: '',
+      replayDirectory: process.cwd(),
     });
     
     expect(verdict.status).toBe('confirmed');
@@ -33,7 +34,8 @@ describe('Verdict Generator', () => {
       expectedFailure: baseFailure,
       actualFailure,
       actualStdout: '',
-      actualStderr: ''
+      actualStderr: '',
+      replayDirectory: process.cwd(),
     });
     
     expect(verdict.status).toBe('confirmed');
@@ -47,7 +49,8 @@ describe('Verdict Generator', () => {
       expectedFailure: baseFailure,
       actualFailure,
       actualStdout: '',
-      actualStderr: ''
+      actualStderr: '',
+      replayDirectory: process.cwd(),
     });
     
     expect(verdict.status).toBe('not_confirmed');

@@ -1,12 +1,16 @@
-import { spawnSync } from 'child_process';
 import { RunConfig } from '../types/artifact';
 import { FailureRecord } from '../types/failure';
 import { executeAndCapture } from '../capture/engine';
+import { createSandbox, cleanupSandbox, SandboxResult } from './sandbox';
 
 export interface ReplayOptions {
   artifactPath: string;
   versionMatch: 'strict' | 'current' | 'branch';
   envOverrides: Record<string, string>;
+  /** Git commit from the artifact manifest (used for strict mode) */
+  gitCommit?: string;
+  /** Git branch from the artifact manifest (used for branch mode) */
+  gitBranch?: string;
 }
 
 export interface ReplayResult {
@@ -14,32 +18,63 @@ export interface ReplayResult {
   expectedFailure: FailureRecord;
   actualStdout: string;
   actualStderr: string;
+  /** The directory where replay actually ran */
+  replayDirectory: string;
+  /** Whether the sandbox fell back to artifact file snapshots */
+  usedFallback?: boolean;
 }
 
 /**
- * Replays a captured artifact.
- * For v0.1, we assume the user has already checked out the right commit
- * and we just run the command in the current directory.
- * (In a later version, this would handle temp directories and git checkouts).
+ * Replays a captured artifact in an isolated sandbox.
+ *
+ * Three modes:
+ *   - current: runs in cwd (no sandbox, fast)
+ *   - strict:  creates temp dir at the exact git commit, falls back to artifact files/
+ *   - branch:  creates temp dir at the branch tip, falls back to current
+ *
+ * The sandbox is always cleaned up after the command finishes.
  */
-export async function replayArtifact(runConfig: RunConfig, expectedFailure: FailureRecord, options: ReplayOptions): Promise<ReplayResult> {
-  // Merge environments
-  const replayEnv = { ...process.env, ...runConfig.environment, ...options.envOverrides } as Record<string, string>;
-  
-  // Re-run the command
-  const replayConfig: RunConfig = {
-    ...runConfig,
-    environment: replayEnv,
-    // We execute in the current directory for now, acting as the replay host
-    working_directory: process.cwd() 
-  };
-  
-  const result = await executeAndCapture(replayConfig);
-  
-  return {
-    actualFailure: result.failure,
-    expectedFailure,
-    actualStdout: result.stdout,
-    actualStderr: result.stderr
-  };
+export async function replayArtifact(
+  runConfig: RunConfig,
+  expectedFailure: FailureRecord,
+  options: ReplayOptions,
+): Promise<ReplayResult> {
+  // 1. Create the sandbox workspace
+  const sandbox: SandboxResult = await createSandbox({
+    mode: options.versionMatch,
+    originalWorkingDir: runConfig.working_directory,
+    artifactPath: options.artifactPath,
+    gitCommit: options.gitCommit,
+    gitBranch: options.gitBranch,
+  });
+
+  try {
+    // 2. Merge environments
+    const replayEnv = {
+      ...process.env,
+      ...runConfig.environment,
+      ...options.envOverrides,
+    } as Record<string, string>;
+
+    // 3. Re-run the command in the sandbox directory
+    const replayConfig: RunConfig = {
+      ...runConfig,
+      environment: replayEnv,
+      working_directory: sandbox.workingDirectory,
+    };
+
+    const result = await executeAndCapture(replayConfig);
+
+    return {
+      actualFailure: result.failure,
+      expectedFailure,
+      actualStdout: result.stdout,
+      actualStderr: result.stderr,
+      replayDirectory: sandbox.workingDirectory,
+      usedFallback: sandbox.usedFallback,
+    };
+  } finally {
+    // 4. Always clean up the sandbox
+    cleanupSandbox(sandbox);
+  }
 }

@@ -275,6 +275,8 @@ program
       artifactPath: artifact,
       versionMatch: options.versionMatch,
       envOverrides,
+      gitCommit: manifest.captured_on.git_commit,
+      gitBranch: manifest.captured_on.git_branch,
     });
 
     const verdict = generateVerdict(replayResult);
