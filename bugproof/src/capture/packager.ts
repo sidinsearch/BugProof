@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { spawnSync } from 'child_process';
 import { filterByExcludePatterns } from '../utils/exclude';
+import { isPathWithinBoundary } from '../utils/security';
 import { ArtifactManifest, EnvSchema, RunConfig, ArtifactMetadata } from '../types/artifact';
 import { FailureRecord } from '../types/failure';
 
@@ -149,6 +150,12 @@ function copySourceFiles(
     const sourcePath = path.join(workingDir, relPath);
     if (!fs.existsSync(sourcePath)) continue;
 
+    // Security: validate path stays within boundaries
+    if (!isPathWithinBoundary(sourcePath, workingDir)) {
+      process.stderr.write(`  Skipping ${relPath}: path traversal detected\n`);
+      continue;
+    }
+
     const stats = fs.statSync(sourcePath);
     if (!stats.isFile()) continue;
 
@@ -168,6 +175,13 @@ function copySourceFiles(
     }
 
     const targetPath = path.join(filesDir, relPath);
+
+    // Security: validate target path stays within artifact boundary
+    if (!isPathWithinBoundary(targetPath, filesDir)) {
+      process.stderr.write(`  Skipping ${relPath}: target path escapes artifact\n`);
+      continue;
+    }
+
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.copyFileSync(sourcePath, targetPath);
 

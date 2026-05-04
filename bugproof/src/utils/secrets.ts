@@ -7,7 +7,7 @@ export const SECRET_PATTERNS = [
   /aws_secret_access_key/i,
   /github_token/i,
   /stripe_sk_/i,
-  /^[A-Z0-9]{20,}$/ // Likely tokens
+  /^[A-Z0-9]{20,128}$/ // Likely tokens (bounded to prevent excessive matching)
 ];
 
 export interface SecretScanResult {

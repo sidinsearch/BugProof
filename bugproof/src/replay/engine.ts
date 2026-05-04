@@ -2,6 +2,7 @@ import { RunConfig } from '../types/artifact';
 import { FailureRecord } from '../types/failure';
 import { executeAndCapture } from '../capture/engine';
 import { createSandbox, cleanupSandbox, SandboxResult } from './sandbox';
+import { sanitizeArtifactEnvironment } from '../utils/security';
 
 export interface ReplayOptions {
   artifactPath: string;
@@ -49,10 +50,11 @@ export async function replayArtifact(
   });
 
   try {
-    // 2. Merge environments
+    // 2. Merge environments — sanitize artifact env to block dangerous overrides
+    const safeArtifactEnv = sanitizeArtifactEnvironment(runConfig.environment);
     const replayEnv = {
       ...process.env,
-      ...runConfig.environment,
+      ...safeArtifactEnv,
       ...options.envOverrides,
     } as Record<string, string>;
 

@@ -241,8 +241,24 @@ program
 
     if (!jsonMode) banner(`${icons.arrow} BugProof Replay`);
 
-    const manifestRaw = fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf-8');
-    const manifest: ArtifactManifest = JSON.parse(manifestRaw);
+    let manifest: ArtifactManifest;
+    let runConfig: RunConfig;
+    let expectedFailure: any;
+
+    try {
+      const manifestRaw = fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf-8');
+      manifest = JSON.parse(manifestRaw);
+      runConfig = JSON.parse(fs.readFileSync(path.join(artifact, 'run.json'), 'utf-8'));
+      expectedFailure = JSON.parse(fs.readFileSync(path.join(artifact, 'failure.json'), 'utf-8'));
+    } catch (parseErr) {
+      if (jsonMode) {
+        console.log(JSON.stringify({ reproduced: false, error: `Corrupted artifact: ${parseErr}` }));
+      } else {
+        error(`Corrupted artifact — could not parse JSON files in ${artifact}`);
+        info(`Detail: ${parseErr}`);
+      }
+      process.exit(1);
+    }
 
     if (!jsonMode) {
       kvLine('Artifact', manifest.name);
@@ -254,9 +270,6 @@ program
       }
       console.log();
     }
-
-    const runConfig: RunConfig = JSON.parse(fs.readFileSync(path.join(artifact, 'run.json'), 'utf-8'));
-    const expectedFailure = JSON.parse(fs.readFileSync(path.join(artifact, 'failure.json'), 'utf-8'));
 
     const envOverrides: Record<string, string> = {};
     for (const entry of options.env) {

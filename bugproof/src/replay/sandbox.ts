@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { spawnSync } from 'child_process';
+import { isValidGitRef } from '../utils/security';
 
 export interface SandboxOptions {
   mode: 'current' | 'strict' | 'branch';
@@ -55,25 +56,30 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
   const ref = options.mode === 'strict' ? options.gitCommit : options.gitBranch;
 
   if (ref) {
-    const worktreeResult = tryGitWorktree(options.originalWorkingDir, tempDir, ref);
+    // Security: validate ref before passing to git
+    if (!isValidGitRef(ref)) {
+      // Invalid ref, skip directly to fallback
+    } else {
+      const worktreeResult = tryGitWorktree(options.originalWorkingDir, tempDir, ref);
 
-    if (worktreeResult.success) {
-      return {
-        workingDirectory: tempDir,
-        tempDir,
-        needsCleanup: true,
-      };
-    }
-
-    // Worktree failed. For strict mode, try a detached checkout clone.
-    if (options.mode === 'strict') {
-      const cloneResult = tryGitCloneAndCheckout(options.originalWorkingDir, tempDir, ref);
-      if (cloneResult.success) {
+      if (worktreeResult.success) {
         return {
           workingDirectory: tempDir,
           tempDir,
           needsCleanup: true,
         };
+      }
+
+      // Worktree failed. For strict mode, try a detached checkout clone.
+      if (options.mode === 'strict') {
+        const cloneResult = tryGitCloneAndCheckout(options.originalWorkingDir, tempDir, ref);
+        if (cloneResult.success) {
+          return {
+            workingDirectory: tempDir,
+            tempDir,
+            needsCleanup: true,
+          };
+        }
       }
     }
   }
@@ -151,7 +157,7 @@ function tryGitWorktree(
   // Create a detached worktree
   const result = spawnSync(
     'git',
-    ['worktree', 'add', '--detach', targetDir, ref],
+    ['worktree', 'add', '--detach', targetDir, '--', ref],
     { cwd: repoDir, encoding: 'utf-8', timeout: 30000 },
   );
 
@@ -188,12 +194,15 @@ function copyDirRecursive(src: string, dest: string): void {
   const entries = fs.readdirSync(src, { withFileTypes: true });
 
   for (const entry of entries) {
+    // Security: skip symlinks to prevent escape attacks
+    if (entry.isSymbolicLink()) continue;
+
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
       copyDirRecursive(srcPath, destPath);
-    } else {
+    } else if (entry.isFile()) {
       fs.copyFileSync(srcPath, destPath);
     }
   }
