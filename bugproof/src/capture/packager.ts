@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { spawnSync } from 'child_process';
+import { filterByExcludePatterns } from '../utils/exclude';
 import { ArtifactManifest, EnvSchema, RunConfig, ArtifactMetadata } from '../types/artifact';
 import { FailureRecord } from '../types/failure';
 
@@ -15,6 +16,7 @@ export interface PackageOptions {
   stderr: string;
   secretKeys: string[];
   includeUntracked?: boolean;
+  excludePatterns?: string[];
 }
 
 export interface FileEntry {
@@ -56,6 +58,7 @@ export async function packageArtifact(
       filesDir,
       options.runConfig.working_directory,
       options.includeUntracked ?? false,
+      options.excludePatterns ?? [],
     );
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
@@ -117,6 +120,7 @@ function copySourceFiles(
   filesDir: string,
   workingDir: string,
   includeUntracked: boolean,
+  excludePatterns: string[] = [],
 ): FileEntry[] {
   const gitArgs = ['ls-files'];
   if (includeUntracked) {
@@ -128,10 +132,15 @@ function copySourceFiles(
     throw new Error(`git ls-files failed: ${result.stderr}`);
   }
 
-  const relativePaths = result.stdout
+  let relativePaths = result.stdout
     .split('\n')
     .map((f) => f.trim())
     .filter((f) => f.length > 0);
+
+  // Apply --exclude patterns
+  if (excludePatterns.length > 0) {
+    relativePaths = filterByExcludePatterns(relativePaths, excludePatterns);
+  }
 
   const entries: FileEntry[] = [];
   let runningSize = 0;

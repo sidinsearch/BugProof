@@ -6,6 +6,9 @@ import { executeAndCapture } from './capture/engine.js';
 import { packageArtifact } from './capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from './utils/secrets.js';
 import { getGitContext } from './utils/git.js';
+import { filterByExcludePatterns } from './utils/exclude.js';
+import { formatCaptureJson, formatReplayJson, formatInspectJson } from './utils/json-output.js';
+import { diffArtifacts, ArtifactSnapshot } from './diff/engine.js';
 import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.js';
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
@@ -30,22 +33,33 @@ program
   .option('--timeout <ms>', 'Command timeout in milliseconds', '300000')
   .option('-n, --name <name>', 'Human-readable name for the artifact')
   .option('-d, --description <desc>', 'Description of the bug being captured')
+  .option('-e, --exclude <pattern>', 'Exclude files matching glob pattern (repeatable)', (v: string, arr: string[]) => {
+    arr.push(v);
+    return arr;
+  }, [] as string[])
+  .option('--json', 'Output structured JSON instead of human-readable text')
   .argument('[command...]', 'The command to run and capture')
   .action(async (commandTokens: string[], options) => {
+    const jsonMode = options.json === true;
+
     if (!commandTokens || commandTokens.length === 0) {
-      error('You must provide a command to capture.');
-      info('Example: bugproof capture -- npm test');
+      if (jsonMode) {
+        console.log(JSON.stringify({ success: false, error: 'No command provided' }));
+      } else {
+        error('You must provide a command to capture.');
+        info('Example: bugproof capture -- npm test');
+      }
       process.exit(1);
     }
 
-    banner(`${icons.bug} BugProof Capture`);
+    if (!jsonMode) banner(`${icons.bug} BugProof Capture`);
 
     // 1. Detect secrets
     const secrets = options.skipSecrets
       ? { hasSecrets: false, detectedKeys: [] as string[] }
       : scanEnvironmentForSecrets(process.env);
 
-    if (secrets.hasSecrets) {
+    if (!jsonMode && secrets.hasSecrets) {
       warn(`Secrets detected in environment (will be redacted):`);
       for (const k of secrets.detectedKeys) {
         console.log(`    ${c.yellow(icons.dot)} ${k}`);
@@ -55,15 +69,19 @@ program
 
     // 2. Collect git context
     const git = getGitContext(process.cwd());
-    if (git.commit) {
-      info(`Git: ${c.cyan(git.branch || 'detached')} @ ${c.dim(git.commit.slice(0, 8))}${git.dirty ? c.yellow(' (dirty)') : ''}`);
-    } else {
-      warn('Not inside a git repository. File capture will be skipped.');
+    if (!jsonMode) {
+      if (git.commit) {
+        info(`Git: ${c.cyan(git.branch || 'detached')} @ ${c.dim(git.commit.slice(0, 8))}${git.dirty ? c.yellow(' (dirty)') : ''}`);
+      } else {
+        warn('Not inside a git repository. File capture will be skipped.');
+      }
     }
 
     // 3. Execute command
-    info(`Running: ${c.bold(commandTokens.join(' '))}`);
-    console.log();
+    if (!jsonMode) {
+      info(`Running: ${c.bold(commandTokens.join(' '))}`);
+      console.log();
+    }
 
     const runConfig: RunConfig = {
       command: commandTokens,
@@ -75,16 +93,18 @@ program
 
     const result = await executeAndCapture(runConfig);
 
-    if (result.failure.timeout) {
-      warn(`Command timed out after ${options.timeout}ms`);
-    }
+    if (!jsonMode) {
+      if (result.failure.timeout) {
+        warn(`Command timed out after ${options.timeout}ms`);
+      }
 
-    const exitColor = result.failure.exit_code === 0 ? c.green : c.red;
-    info(`Exit code: ${exitColor(String(result.failure.exit_code))}`);
-    info(`Duration: ${c.dim(result.failure.duration_ms + 'ms')}`);
+      const exitColor = result.failure.exit_code === 0 ? c.green : c.red;
+      info(`Exit code: ${exitColor(String(result.failure.exit_code))}`);
+      info(`Duration: ${c.dim(result.failure.duration_ms + 'ms')}`);
 
-    if (result.failure.exit_code === 0) {
-      warn('Command succeeded (exit 0). Capturing anyway, but replay verdict may report "not reproduced".');
+      if (result.failure.exit_code === 0) {
+        warn('Command succeeded (exit 0). Capturing anyway, but replay verdict may report "not reproduced".');
+      }
     }
 
     // 4. Build manifest
@@ -112,8 +132,8 @@ program
       working_directory: runConfig.working_directory,
       exit_code: result.failure.exit_code,
       duration_ms: result.failure.duration_ms,
-      files_count: 0, // populated by packager
-      files_size_bytes: 0, // populated by packager
+      files_count: 0,
+      files_size_bytes: 0,
       secrets_detected: secrets.hasSecrets,
       secrets_skipped: secrets.detectedKeys,
     };
@@ -140,8 +160,10 @@ program
 
     // 5. Package artifact
     const artifactPath = path.join(process.cwd(), `${artifactName}.bug`);
-    console.log();
-    info('Packaging artifact...');
+    if (!jsonMode) {
+      console.log();
+      info('Packaging artifact...');
+    }
 
     try {
       const packResult = await packageArtifact(artifactPath, {
@@ -154,23 +176,41 @@ program
         stderr: result.stderr,
         secretKeys: secrets.detectedKeys,
         includeUntracked: options.includeUntracked,
+        excludePatterns: options.exclude,
       });
 
-      console.log();
-      success(c.bold('Artifact captured!'));
-      console.log();
-      kvLine('Path', artifactPath);
-      kvLine('Files', `${packResult.filesCount} files (${(packResult.totalSize / 1024).toFixed(1)} KB)`);
-      kvLine('Exit code', String(result.failure.exit_code));
-      kvLine('Fingerprint', c.dim(result.failure.fingerprint.slice(0, 24) + '...'));
-      if (result.failure.error_patterns.length > 0) {
-        kvLine('Patterns', result.failure.error_patterns.join(', '));
+      if (jsonMode) {
+        console.log(formatCaptureJson({
+          manifest,
+          failure: result.failure,
+          artifactPath,
+          filesCount: packResult.filesCount,
+          totalSize: packResult.totalSize,
+        }));
+      } else {
+        console.log();
+        success(c.bold('Artifact captured!'));
+        console.log();
+        kvLine('Path', artifactPath);
+        kvLine('Files', `${packResult.filesCount} files (${(packResult.totalSize / 1024).toFixed(1)} KB)`);
+        kvLine('Exit code', String(result.failure.exit_code));
+        kvLine('Fingerprint', c.dim(result.failure.fingerprint.slice(0, 24) + '...'));
+        if (result.failure.error_patterns.length > 0) {
+          kvLine('Patterns', result.failure.error_patterns.join(', '));
+        }
+        if (options.exclude.length > 0) {
+          kvLine('Excluded', options.exclude.join(', '));
+        }
+        console.log();
+        info(`Replay with: ${c.cyan(`bugproof replay ${artifactName}.bug`)}`);
+        console.log();
       }
-      console.log();
-      info(`Replay with: ${c.cyan(`bugproof replay ${artifactName}.bug`)}`);
-      console.log();
     } catch (err) {
-      error(`Packaging failed: ${err}`);
+      if (jsonMode) {
+        console.log(JSON.stringify({ success: false, error: String(err) }));
+      } else {
+        error(`Packaging failed: ${err}`);
+      }
       process.exit(1);
     }
   });
@@ -186,31 +226,38 @@ program
     arr.push(v);
     return arr;
   }, [] as string[])
+  .option('--json', 'Output structured JSON instead of human-readable text')
   .action(async (artifact: string, options) => {
+    const jsonMode = options.json === true;
+
     if (!fs.existsSync(artifact)) {
-      error(`Artifact not found at ${artifact}`);
+      if (jsonMode) {
+        console.log(JSON.stringify({ reproduced: false, error: `Artifact not found: ${artifact}` }));
+      } else {
+        error(`Artifact not found at ${artifact}`);
+      }
       process.exit(1);
     }
 
-    banner(`${icons.arrow} BugProof Replay`);
+    if (!jsonMode) banner(`${icons.arrow} BugProof Replay`);
 
-    // Read artifact metadata
     const manifestRaw = fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf-8');
     const manifest: ArtifactManifest = JSON.parse(manifestRaw);
 
-    kvLine('Artifact', manifest.name);
-    kvLine('Captured', manifest.captured_at);
-    kvLine('Command', manifest.command.join(' '));
-    kvLine('Platform', `${manifest.captured_on.os}/${manifest.captured_on.arch}`);
-    if (manifest.captured_on.git_commit) {
-      kvLine('Git', `${manifest.captured_on.git_branch || '?'} @ ${manifest.captured_on.git_commit.slice(0, 8)}`);
+    if (!jsonMode) {
+      kvLine('Artifact', manifest.name);
+      kvLine('Captured', manifest.captured_at);
+      kvLine('Command', manifest.command.join(' '));
+      kvLine('Platform', `${manifest.captured_on.os}/${manifest.captured_on.arch}`);
+      if (manifest.captured_on.git_commit) {
+        kvLine('Git', `${manifest.captured_on.git_branch || '?'} @ ${manifest.captured_on.git_commit.slice(0, 8)}`);
+      }
+      console.log();
     }
-    console.log();
 
     const runConfig: RunConfig = JSON.parse(fs.readFileSync(path.join(artifact, 'run.json'), 'utf-8'));
     const expectedFailure = JSON.parse(fs.readFileSync(path.join(artifact, 'failure.json'), 'utf-8'));
 
-    // Parse env overrides
     const envOverrides: Record<string, string> = {};
     for (const entry of options.env) {
       const eq = entry.indexOf('=');
@@ -219,8 +266,10 @@ program
       }
     }
 
-    info('Replaying command...');
-    console.log();
+    if (!jsonMode) {
+      info('Replaying command...');
+      console.log();
+    }
 
     const replayResult = await replayArtifact(runConfig, expectedFailure, {
       artifactPath: artifact,
@@ -230,18 +279,26 @@ program
 
     const verdict = generateVerdict(replayResult);
 
-    // Print verdict
-    console.log();
-    if (verdict.status === 'confirmed') {
-      success(c.bold(c.green('REPRODUCTION CONFIRMED')));
+    if (jsonMode) {
+      console.log(formatReplayJson({
+        verdict,
+        expectedExitCode: expectedFailure.exit_code,
+        actualExitCode: replayResult.actualFailure.exit_code,
+        artifactName: manifest.name,
+      }));
     } else {
-      error(c.bold(c.red('NOT REPRODUCED')));
+      console.log();
+      if (verdict.status === 'confirmed') {
+        success(c.bold(c.green('REPRODUCTION CONFIRMED')));
+      } else {
+        error(c.bold(c.red('NOT REPRODUCED')));
+      }
+      console.log();
+      kvLine('Expected exit', String(expectedFailure.exit_code));
+      kvLine('Actual exit', String(replayResult.actualFailure.exit_code));
+      kvLine('Verdict', verdict.message);
+      console.log();
     }
-    console.log();
-    kvLine('Expected exit', String(expectedFailure.exit_code));
-    kvLine('Actual exit', String(replayResult.actualFailure.exit_code));
-    kvLine('Verdict', verdict.message);
-    console.log();
 
     process.exit(verdict.status === 'confirmed' ? 0 : 1);
   });
@@ -252,18 +309,34 @@ program
   .command('inspect')
   .description('Inspect the contents of a .bug artifact')
   .argument('<artifact>', 'Path to the .bug artifact directory')
-  .action((artifact: string) => {
+  .option('--json', 'Output structured JSON instead of human-readable text')
+  .action((artifact: string, options) => {
+    const jsonMode = options.json === true;
+
     if (!fs.existsSync(artifact)) {
-      error(`Artifact not found at ${artifact}`);
+      if (jsonMode) {
+        console.log(JSON.stringify({ error: `Artifact not found: ${artifact}` }));
+      } else {
+        error(`Artifact not found at ${artifact}`);
+      }
       process.exit(1);
     }
-
-    banner(`${icons.box} BugProof Inspect`);
 
     const manifest: ArtifactManifest = JSON.parse(
       fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf-8'),
     );
     const failure = JSON.parse(fs.readFileSync(path.join(artifact, 'failure.json'), 'utf-8'));
+
+    // Read file entries
+    const filesJsonPath = path.join(artifact, 'files.json');
+    const files = fs.existsSync(filesJsonPath) ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8')) : [];
+
+    if (jsonMode) {
+      console.log(formatInspectJson({ manifest, failure, files }));
+      return;
+    }
+
+    banner(`${icons.box} BugProof Inspect`);
 
     // Manifest
     console.log(c.bold('  Manifest'));
@@ -309,9 +382,7 @@ program
     console.log();
 
     // Files summary
-    const filesJsonPath = path.join(artifact, 'files.json');
-    if (fs.existsSync(filesJsonPath)) {
-      const files = JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8'));
+    if (files.length > 0) {
       console.log(c.bold(`  Files (${files.length} captured)`));
       const shown = files.slice(0, 15);
       for (const f of shown) {
@@ -334,6 +405,91 @@ program
       }
     }
 
+    console.log();
+  });
+
+// ─── DIFF ────────────────────────────────────────────────────────────────────
+
+program
+  .command('diff')
+  .description('Compare two .bug artifacts side by side')
+  .argument('<left>', 'Path to the first .bug artifact')
+  .argument('<right>', 'Path to the second .bug artifact')
+  .option('--json', 'Output structured JSON instead of human-readable text')
+  .action((leftPath: string, rightPath: string, options) => {
+    const jsonMode = options.json === true;
+
+    for (const [label, p] of [['Left', leftPath], ['Right', rightPath]] as const) {
+      if (!fs.existsSync(p)) {
+        if (jsonMode) {
+          console.log(JSON.stringify({ error: `${label} artifact not found: ${p}` }));
+        } else {
+          error(`${label} artifact not found at ${p}`);
+        }
+        process.exit(1);
+      }
+    }
+
+    const loadSnapshot = (artifactDir: string): ArtifactSnapshot => {
+      const manifest = JSON.parse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf-8'));
+      const failure = JSON.parse(fs.readFileSync(path.join(artifactDir, 'failure.json'), 'utf-8'));
+      const filesJsonPath = path.join(artifactDir, 'files.json');
+      const files = fs.existsSync(filesJsonPath) ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8')) : [];
+      return { manifest, failure, files };
+    };
+
+    const left = loadSnapshot(leftPath);
+    const right = loadSnapshot(rightPath);
+    const result = diffArtifacts(left, right);
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    banner(`${icons.box} BugProof Diff`);
+
+    kvLine('Left', left.manifest.name);
+    kvLine('Right', right.manifest.name);
+    console.log();
+
+    if (result.identical) {
+      success('Artifacts are identical.');
+      console.log();
+      return;
+    }
+
+    // Property changes
+    if (result.changes.length > 0) {
+      console.log(c.bold('  Property Changes'));
+      for (const ch of result.changes) {
+        console.log(`    ${c.yellow(ch.field)}`);
+        console.log(`      ${c.red('- ' + String(ch.left))}`);
+        console.log(`      ${c.green('+ ' + String(ch.right))}`);
+      }
+      console.log();
+    }
+
+    // File changes
+    if (result.fileChanges) {
+      const fc = result.fileChanges;
+      const hasChanges = fc.added.length > 0 || fc.removed.length > 0 || fc.modified.length > 0;
+      if (hasChanges) {
+        console.log(c.bold('  File Changes'));
+        for (const f of fc.added) {
+          console.log(`    ${c.green('+ ' + f)}`);
+        }
+        for (const f of fc.removed) {
+          console.log(`    ${c.red('- ' + f)}`);
+        }
+        for (const f of fc.modified) {
+          console.log(`    ${c.yellow('~ ' + f)}`);
+        }
+        console.log();
+      }
+    }
+
+    info(`${result.changes.length} property changes, ${(result.fileChanges?.added.length || 0) + (result.fileChanges?.removed.length || 0) + (result.fileChanges?.modified.length || 0)} file changes.`);
     console.log();
   });
 
