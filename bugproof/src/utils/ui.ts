@@ -26,8 +26,8 @@ export const icons = {
   check:   isColorSupported ? '\u2714' : '+',
   cross:   isColorSupported ? '\u2718' : 'x',
   warning: isColorSupported ? '\u26A0' : '!',
-  arrow:   isColorSupported ? '\u25B6' : '>',
-  bug:     isColorSupported ? '\uD83D\uDC1B' : '*',
+  arrow:   isColorSupported ? '\u279C' : '>', // Sleeker arrow
+  bug:     isColorSupported ? '\uD83E\uDEB2' : '*', // Beetle emoji for modern look
   box:     isColorSupported ? '\u25A0' : '#',
   dot:     isColorSupported ? '\u2022' : '-',
 };
@@ -35,9 +35,9 @@ export const icons = {
 export function banner(text: string): void {
   const line = '\u2500'.repeat(Math.max(text.length + 4, 40));
   console.log();
-  console.log(c.cyan(line));
-  console.log(c.cyan(`  ${c.bold(text)}`));
-  console.log(c.cyan(line));
+  console.log(c.cyan(`\u256D${line}\u256E`));
+  console.log(c.cyan(`\u2502  ${c.bold(text.padEnd(line.length - 2))}\u2502`));
+  console.log(c.cyan(`\u2570${line}\u256F`));
   console.log();
 }
 
