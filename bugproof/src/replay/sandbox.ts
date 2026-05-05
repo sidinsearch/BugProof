@@ -19,6 +19,8 @@ export interface SandboxOptions {
   artifactPath: string;
   gitCommit?: string;
   gitBranch?: string;
+  /** Optional pre-created directory to place the sandbox into */
+  targetDir?: string;
 }
 
 export interface SandboxResult {
@@ -50,7 +52,7 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
   }
 
   // ── strict or branch: try git worktree ──
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-replay-'));
+  const tempDir = options.targetDir || fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-replay-'));
 
   // Determine the ref to checkout
   const ref = options.mode === 'strict' ? options.gitCommit : options.gitBranch;
@@ -97,7 +99,9 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
   }
 
   // Nothing worked, clean up and fall back to cwd
-  fs.rmSync(tempDir, { recursive: true, force: true });
+  if (!options.targetDir) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
   return {
     workingDirectory: options.originalWorkingDir,
     needsCleanup: false,
