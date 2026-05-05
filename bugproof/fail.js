@@ -1,0 +1,1 @@
+console.error("Windows Error!"); process.exit(1);
