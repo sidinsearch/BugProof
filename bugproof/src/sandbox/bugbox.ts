@@ -20,12 +20,24 @@ import {
   addFirewallBlockRule,
   NetworkStrategy,
 } from './network';
+import {
+  selectProcessStrategy,
+  buildProcessIsolationArgs,
+  ProcessStrategy,
+} from './process';
+import {
+  selectResourceStrategy,
+  buildResourceIsolationArgs,
+  ResourceStrategy,
+  ResourceLimits,
+} from './resources';
 import { RunConfig } from '../types/artifact';
 
 export interface BugBoxOptions {
   level: 'workspace' | 'isolated' | 'full';
   sandboxOptions: SandboxOptions;
   command: string[];
+  resourceLimits?: ResourceLimits;
 }
 
 export interface BugBoxResult {
@@ -34,6 +46,8 @@ export interface BugBoxResult {
   appliedLayers: string[];
   skippedLayers: string[];
   networkStrategy: NetworkStrategy;
+  processStrategy: ProcessStrategy;
+  resourceStrategy: ResourceStrategy;
   isolatedDir?: IsolatedDirResult;
   runConfigOverrides: Partial<RunConfig>;
   cleanupFn: () => void;
@@ -58,6 +72,8 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
       appliedLayers,
       skippedLayers,
       networkStrategy: 'none',
+      processStrategy: 'none',
+      resourceStrategy: 'none',
       runConfigOverrides: {},
       cleanupFn: () => cleanupSandbox(sandboxResult),
     };
@@ -113,7 +129,38 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
     }
   }
 
-  // 5. Build combined cleanup
+  // 5. Process & Resource Isolation (Only in 'full' mode)
+  let procStrategy: ProcessStrategy = 'none';
+  let resStrategy: ResourceStrategy = 'none';
+
+  if (options.level === 'full') {
+    // Process Isolation
+    procStrategy = selectProcessStrategy(caps);
+    if (procStrategy === 'none') {
+      skippedLayers.push('process: primitive not available on this OS');
+    } else {
+      appliedLayers.push('process');
+      runConfigOverrides.command = buildProcessIsolationArgs(
+        procStrategy,
+        runConfigOverrides.command || options.command
+      );
+    }
+
+    // Resource Limits
+    resStrategy = selectResourceStrategy(caps);
+    if (resStrategy === 'none') {
+      skippedLayers.push('resources: primitive not available on this OS');
+    } else if (options.resourceLimits && (options.resourceLimits.maxMemoryMB || options.resourceLimits.maxCpuPercent)) {
+      appliedLayers.push('resources');
+      runConfigOverrides.command = buildResourceIsolationArgs(
+        resStrategy,
+        runConfigOverrides.command || options.command,
+        options.resourceLimits
+      );
+    }
+  }
+
+  // 6. Build combined cleanup
   const cleanupFn = () => {
     // 1. Tear down network rules
     netCleanup();
@@ -129,6 +176,8 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
     appliedLayers,
     skippedLayers,
     networkStrategy: netStrategy,
+    processStrategy: procStrategy,
+    resourceStrategy: resStrategy,
     isolatedDir,
     runConfigOverrides,
     cleanupFn,

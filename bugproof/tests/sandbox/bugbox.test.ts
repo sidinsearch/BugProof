@@ -25,6 +25,16 @@ jest.mock('../../src/sandbox/network', () => ({
   addFirewallBlockRule: jest.fn(),
 }));
 
+jest.mock('../../src/sandbox/process', () => ({
+  selectProcessStrategy: jest.fn(),
+  buildProcessIsolationArgs: jest.fn(),
+}));
+
+jest.mock('../../src/sandbox/resources', () => ({
+  selectResourceStrategy: jest.fn(),
+  buildResourceIsolationArgs: jest.fn(),
+}));
+
 jest.mock('../../src/replay/sandbox', () => ({
   createSandbox: jest.fn(),
   cleanupSandbox: jest.fn(),
@@ -99,7 +109,7 @@ describe('Bug-Box Orchestrator', () => {
     // If fallback was used, it should lock the files dir
     expect(lockDirReadOnly).toHaveBeenCalledWith('/fake/bugbox/files');
 
-    expect(result.runConfigOverrides.workingDirectory).toBe('/fake/bugbox/workspace');
+    expect(result.runConfigOverrides.working_directory).toBe('/fake/bugbox/workspace');
   });
 
   it('should apply network isolation when level is "isolated" and capabilities allow', async () => {
@@ -121,5 +131,36 @@ describe('Bug-Box Orchestrator', () => {
     expect(result.appliedLayers).toContain('network');
     expect(result.networkStrategy).toBe('unshare');
     expect(result.runConfigOverrides.command).toEqual(['unshare', '--net', '--', 'npm', 'test']);
+  });
+
+  it('should apply process and resources isolation in "full" mode', async () => {
+    const { createSandbox } = require('../../src/replay/sandbox');
+    const { selectNetworkStrategy, buildNetworkIsolationArgs, createNetworkCleanup } = require('../../src/sandbox/network');
+    const { selectProcessStrategy, buildProcessIsolationArgs } = require('../../src/sandbox/process');
+    const { selectResourceStrategy, buildResourceIsolationArgs } = require('../../src/sandbox/resources');
+
+    createSandbox.mockResolvedValue({ workingDirectory: '/fake/bugbox/workspace', needsCleanup: true });
+    
+    selectNetworkStrategy.mockReturnValue('none');
+    buildNetworkIsolationArgs.mockReturnValue({ command: ['npm', 'test'], needsPreExec: false, strategy: 'none' });
+    createNetworkCleanup.mockReturnValue(jest.fn());
+
+    selectProcessStrategy.mockReturnValue('unshare');
+    buildProcessIsolationArgs.mockReturnValue(['unshare', '--pid', '--', 'npm', 'test']);
+
+    selectResourceStrategy.mockReturnValue('cgroups');
+    buildResourceIsolationArgs.mockReturnValue(['systemd-run', '--', 'unshare', '--pid', '--', 'npm', 'test']);
+
+    const result = await createBugBox({
+      ...baseOpts,
+      level: 'full',
+      resourceLimits: { maxMemoryMB: 256, maxCpuPercent: 50 },
+    });
+
+    expect(result.appliedLayers).toContain('process');
+    expect(result.appliedLayers).toContain('resources');
+    expect(result.processStrategy).toBe('unshare');
+    expect(result.resourceStrategy).toBe('cgroups');
+    expect(result.runConfigOverrides.command).toEqual(['systemd-run', '--', 'unshare', '--pid', '--', 'npm', 'test']);
   });
 });
