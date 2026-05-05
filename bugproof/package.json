@@ -29,6 +29,8 @@
   "author": "BugProof Contributors",
   "license": "MIT",
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/extract-zip": "^2.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -41,7 +43,9 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "commander": "^11.0.0"
+    "archiver": "^7.0.1",
+    "commander": "^11.0.0",
+    "extract-zip": "^2.0.1"
   },
   "engines": {
     "node": ">=18.0.0"

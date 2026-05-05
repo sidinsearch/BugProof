@@ -5,33 +5,33 @@
  * and the existing replay sandbox into a single easy-to-use interface.
  */
 
-import { SandboxResult, SandboxOptions, createSandbox, cleanupSandbox } from '../replay/sandbox';
-import { detectCapabilities, PlatformCapabilities } from './capabilities';
+import { SandboxResult, SandboxOptions, createSandbox, cleanupSandbox } from '../replay/sandbox.js';
+import { detectCapabilities, PlatformCapabilities } from './capabilities.js';
 import {
   createIsolatedDir,
   lockDirReadOnly,
   cleanupIsolatedDir,
   IsolatedDirResult,
-} from './filesystem';
+} from './filesystem.js';
 import {
   selectNetworkStrategy,
   buildNetworkIsolationArgs,
   createNetworkCleanup,
   addFirewallBlockRule,
   NetworkStrategy,
-} from './network';
+} from './network.js';
 import {
   selectProcessStrategy,
   buildProcessIsolationArgs,
   ProcessStrategy,
-} from './process';
+} from './process.js';
 import {
   selectResourceStrategy,
   buildResourceIsolationArgs,
   ResourceStrategy,
   ResourceLimits,
-} from './resources';
-import { RunConfig } from '../types/artifact';
+} from './resources.js';
+import { RunConfig } from '../types/artifact.js';
 
 export interface BugBoxOptions {
   level: 'workspace' | 'isolated' | 'full';

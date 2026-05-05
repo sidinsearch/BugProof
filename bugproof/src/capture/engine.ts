@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
-import { RunConfig } from '../types/artifact';
-import { FailureRecord } from '../types/failure';
-import { generateExactFingerprint, extractErrorPatterns } from '../utils/fingerprint';
+import { RunConfig } from '../types/artifact.js';
+import { FailureRecord } from '../types/failure.js';
+import { generateExactFingerprint, extractErrorPatterns } from '../utils/fingerprint.js';
 
 /**
  * Spawns the command, captures its output, and produces a FailureRecord.

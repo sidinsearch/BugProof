@@ -3,10 +3,10 @@
  * When --json is passed, the CLI prints these instead of human-readable output.
  */
 
-import { ArtifactManifest } from '../types/artifact';
-import { FailureRecord } from '../types/failure';
-import { Verdict } from '../replay/verdict';
-import { FileEntry } from '../capture/packager';
+import { ArtifactManifest } from '../types/artifact.js';
+import { FailureRecord } from '../types/failure.js';
+import { Verdict } from '../replay/verdict.js';
+import { FileEntry } from '../capture/packager.js';
 
 // ─── Capture ─────────────────────────────────────────────────────────────────
 

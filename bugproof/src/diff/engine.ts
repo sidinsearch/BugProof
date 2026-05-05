@@ -2,9 +2,9 @@
  * Diff engine: compares two .bug artifacts and produces a structured diff report.
  */
 
-import { ArtifactManifest } from '../types/artifact';
-import { FailureRecord } from '../types/failure';
-import { FileEntry } from '../capture/packager';
+import { ArtifactManifest } from '../types/artifact.js';
+import { FailureRecord } from '../types/failure.js';
+import { FileEntry } from '../capture/packager.js';
 
 export interface DiffChange {
   field: string;

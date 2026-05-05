@@ -8,13 +8,17 @@ import { scanEnvironmentForSecrets, buildEnvironmentSchema } from './utils/secre
 import { getGitContext } from './utils/git.js';
 import { filterByExcludePatterns } from './utils/exclude.js';
 import { formatCaptureJson, formatReplayJson, formatInspectJson } from './utils/json-output.js';
+import { extractZip } from './utils/archive.js';
 import { diffArtifacts, ArtifactSnapshot } from './diff/engine.js';
 import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.js';
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
 import { banner, success, warn, error, info, kvLine, c, icons } from './utils/ui.js';
+import { registerAssociationsSilently } from './utils/associations.js';
 
 const VERSION = '0.1.0';
+
+registerAssociationsSilently();
 
 const program = new Command();
 
@@ -242,16 +246,28 @@ program
 
     if (!jsonMode) banner(`${icons.arrow} BugProof Replay`);
 
-    let manifest: ArtifactManifest;
-    let runConfig: RunConfig;
-    let expectedFailure: any;
+    const stat = fs.statSync(artifact);
+    let targetPath = artifact;
+    let tempDir: string | undefined;
 
     try {
-      const manifestRaw = fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf-8');
-      manifest = JSON.parse(manifestRaw);
-      runConfig = JSON.parse(fs.readFileSync(path.join(artifact, 'run.json'), 'utf-8'));
-      expectedFailure = JSON.parse(fs.readFileSync(path.join(artifact, 'failure.json'), 'utf-8'));
-    } catch (parseErr) {
+      if (stat.isFile()) {
+        if (!jsonMode) info('Extracting compressed artifact...');
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-extract-'));
+        targetPath = tempDir;
+        await extractZip(artifact, tempDir);
+      }
+
+      let manifest: ArtifactManifest;
+      let runConfig: RunConfig;
+      let expectedFailure: any;
+
+      try {
+        const manifestRaw = fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8');
+        manifest = JSON.parse(manifestRaw);
+        runConfig = JSON.parse(fs.readFileSync(path.join(targetPath, 'run.json'), 'utf-8'));
+        expectedFailure = JSON.parse(fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8'));
+      } catch (parseErr) {
       if (jsonMode) {
         console.log(JSON.stringify({ reproduced: false, error: `Corrupted artifact: ${parseErr}` }));
       } else {
@@ -285,9 +301,9 @@ program
       console.log();
     }
 
-    const replayResult = await replayArtifact(runConfig, expectedFailure, {
-      artifactPath: artifact,
-      versionMatch: options.versionMatch,
+      const replayResult = await replayArtifact(runConfig, expectedFailure, {
+        artifactPath: targetPath,
+        versionMatch: options.versionMatch,
       sandboxLevel: options.sandbox,
       envOverrides,
       gitCommit: manifest.captured_on.git_commit,
@@ -329,8 +345,18 @@ program
       console.log();
     }
 
-    process.exit(verdict.status === 'confirmed' ? 0 : 1);
-  });
+    const exitCode = verdict.status === 'confirmed' ? 0 : 1;
+    if (!tempDir) {
+      process.exit(exitCode);
+    } else {
+      process.exitCode = exitCode;
+    }
+  } finally {
+    if (tempDir) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+});
 
 // ─── INSPECT ─────────────────────────────────────────────────────────────────
 
@@ -339,7 +365,7 @@ program
   .description('Inspect the contents of a .bug artifact')
   .argument('<artifact>', 'Path to the .bug artifact directory')
   .option('--json', 'Output structured JSON instead of human-readable text')
-  .action((artifact: string, options) => {
+  .action(async (artifact: string, options) => {
     const jsonMode = options.json === true;
 
     if (!fs.existsSync(artifact)) {
@@ -351,14 +377,26 @@ program
       process.exit(1);
     }
 
-    const manifest: ArtifactManifest = JSON.parse(
-      fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf-8'),
-    );
-    const failure = JSON.parse(fs.readFileSync(path.join(artifact, 'failure.json'), 'utf-8'));
+    const stat = fs.statSync(artifact);
+    let targetPath = artifact;
+    let tempDir: string | undefined;
 
-    // Read file entries
-    const filesJsonPath = path.join(artifact, 'files.json');
-    const files = fs.existsSync(filesJsonPath) ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8')) : [];
+    try {
+      if (stat.isFile()) {
+        if (!jsonMode) info('Extracting compressed artifact...');
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-extract-'));
+        targetPath = tempDir;
+        await extractZip(artifact, tempDir);
+      }
+
+      const manifest: ArtifactManifest = JSON.parse(
+        fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8'),
+      );
+      const failure = JSON.parse(fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8'));
+
+      // Read file entries
+      const filesJsonPath = path.join(targetPath, 'files.json');
+      const files = fs.existsSync(filesJsonPath) ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8')) : [];
 
     if (jsonMode) {
       console.log(formatInspectJson({ manifest, failure, files }));
@@ -435,6 +473,11 @@ program
     }
 
     console.log();
+    } finally {
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
   });
 
 // ─── DIFF ────────────────────────────────────────────────────────────────────
@@ -445,7 +488,7 @@ program
   .argument('<left>', 'Path to the first .bug artifact')
   .argument('<right>', 'Path to the second .bug artifact')
   .option('--json', 'Output structured JSON instead of human-readable text')
-  .action((leftPath: string, rightPath: string, options) => {
+  .action(async (leftPath: string, rightPath: string, options) => {
     const jsonMode = options.json === true;
 
     for (const [label, p] of [['Left', leftPath], ['Right', rightPath]] as const) {
@@ -459,6 +502,27 @@ program
       }
     }
 
+    let leftTarget = leftPath;
+    let rightTarget = rightPath;
+    const tempDirs: string[] = [];
+
+    try {
+      if (!jsonMode) info('Extracting artifacts...');
+
+      if (fs.statSync(leftPath).isFile()) {
+        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-diff-l-'));
+        tempDirs.push(d);
+        leftTarget = d;
+        await extractZip(leftPath, d);
+      }
+
+      if (fs.statSync(rightPath).isFile()) {
+        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-diff-r-'));
+        tempDirs.push(d);
+        rightTarget = d;
+        await extractZip(rightPath, d);
+      }
+
     const loadSnapshot = (artifactDir: string): ArtifactSnapshot => {
       const manifest = JSON.parse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf-8'));
       const failure = JSON.parse(fs.readFileSync(path.join(artifactDir, 'failure.json'), 'utf-8'));
@@ -467,8 +531,8 @@ program
       return { manifest, failure, files };
     };
 
-    const left = loadSnapshot(leftPath);
-    const right = loadSnapshot(rightPath);
+    const left = loadSnapshot(leftTarget);
+    const right = loadSnapshot(rightTarget);
     const result = diffArtifacts(left, right);
 
     if (jsonMode) {
@@ -520,6 +584,11 @@ program
 
     info(`${result.changes.length} property changes, ${(result.fileChanges?.added.length || 0) + (result.fileChanges?.removed.length || 0) + (result.fileChanges?.modified.length || 0)} file changes.`);
     console.log();
+    } finally {
+      for (const d of tempDirs) {
+        fs.rmSync(d, { recursive: true, force: true });
+      }
+    }
   });
 
 program.parse(process.argv);

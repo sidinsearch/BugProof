@@ -1,4 +1,4 @@
-import { ReplayResult } from './engine';
+import { ReplayResult } from './engine.js';
 
 export type VerdictStatus = 'confirmed' | 'not_confirmed' | 'blocked_by_env';
 

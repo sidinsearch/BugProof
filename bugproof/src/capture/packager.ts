@@ -1,11 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as os from 'os';
 import { spawnSync } from 'child_process';
-import { filterByExcludePatterns } from '../utils/exclude';
-import { isPathWithinBoundary } from '../utils/security';
-import { ArtifactManifest, EnvSchema, RunConfig, ArtifactMetadata } from '../types/artifact';
-import { FailureRecord } from '../types/failure';
+import { zipDirectory } from '../utils/archive.js';
+import { filterByExcludePatterns } from '../utils/exclude.js';
+import { isPathWithinBoundary } from '../utils/security.js';
+import { ArtifactManifest, EnvSchema, RunConfig, ArtifactMetadata } from '../types/artifact.js';
+import { FailureRecord } from '../types/failure.js';
 
 export interface PackageOptions {
   manifest: ArtifactManifest;
@@ -47,12 +49,12 @@ export async function packageArtifact(
   artifactPath: string,
   options: PackageOptions,
 ): Promise<{ filesCount: number; totalSize: number; fileEntries: FileEntry[] }> {
-  // 1. Create artifact directory
-  fs.mkdirSync(artifactPath, { recursive: true });
+  // 1. Create a temporary staging directory
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-pkg-'));
 
   try {
     // 2. Copy source files first so we can compute counts and checksums
-    const filesDir = path.join(artifactPath, 'files');
+    const filesDir = path.join(tempDir, 'files');
     fs.mkdirSync(filesDir, { recursive: true });
 
     const fileEntries = copySourceFiles(
@@ -80,17 +82,17 @@ export async function packageArtifact(
     const safeRunConfig: RunConfig = { ...options.runConfig, environment: sanitizedEnv };
 
     // 5. Write JSON schema files
-    fs.writeFileSync(path.join(artifactPath, 'manifest.json'), JSON.stringify(options.manifest, null, 2));
-    fs.writeFileSync(path.join(artifactPath, 'env.schema.json'), JSON.stringify(options.envSchema, null, 2));
-    fs.writeFileSync(path.join(artifactPath, 'metadata.json'), JSON.stringify(options.metadata, null, 2));
-    fs.writeFileSync(path.join(artifactPath, 'run.json'), JSON.stringify(safeRunConfig, null, 2));
-    fs.writeFileSync(path.join(artifactPath, 'failure.json'), JSON.stringify(options.failure, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'manifest.json'), JSON.stringify(options.manifest, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'env.schema.json'), JSON.stringify(options.envSchema, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'metadata.json'), JSON.stringify(options.metadata, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'run.json'), JSON.stringify(safeRunConfig, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'failure.json'), JSON.stringify(options.failure, null, 2));
 
     // 6. Write file manifest with checksums
-    fs.writeFileSync(path.join(artifactPath, 'files.json'), JSON.stringify(fileEntries, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'files.json'), JSON.stringify(fileEntries, null, 2));
 
     // 7. Write logs
-    const logsDir = path.join(artifactPath, 'logs');
+    const logsDir = path.join(tempDir, 'logs');
     fs.mkdirSync(logsDir, { recursive: true });
     fs.writeFileSync(path.join(logsDir, 'stdout.txt'), options.stdout);
     fs.writeFileSync(path.join(logsDir, 'stderr.txt'), options.stderr);
@@ -106,11 +108,19 @@ export async function packageArtifact(
       ),
     );
 
+    // 8. Compress the temporary directory into the final .bug zip archive
+    await zipDirectory(tempDir, artifactPath);
+
     return { filesCount: fileEntries.length, totalSize, fileEntries };
   } catch (err) {
     // Cleanup incomplete artifact on failure
-    fs.rmSync(artifactPath, { recursive: true, force: true });
+    if (fs.existsSync(artifactPath)) {
+      fs.rmSync(artifactPath, { force: true });
+    }
     throw err;
+  } finally {
+    // Always clean up the temporary staging directory
+    fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
