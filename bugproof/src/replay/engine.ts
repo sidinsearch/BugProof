@@ -1,7 +1,7 @@
 import { RunConfig } from '../types/artifact';
 import { FailureRecord } from '../types/failure';
 import { executeAndCapture } from '../capture/engine';
-import { createSandbox, cleanupSandbox, SandboxResult } from './sandbox';
+import { createBugBox, BugBoxOptions, BugBoxResult } from '../sandbox/bugbox';
 import { sanitizeArtifactEnvironment } from '../utils/security';
 
 export interface ReplayOptions {
@@ -12,6 +12,7 @@ export interface ReplayOptions {
   gitCommit?: string;
   /** Git branch from the artifact manifest (used for branch mode) */
   gitBranch?: string;
+  sandboxLevel?: 'workspace' | 'isolated' | 'full';
 }
 
 export interface ReplayResult {
@@ -23,6 +24,13 @@ export interface ReplayResult {
   replayDirectory: string;
   /** Whether the sandbox fell back to artifact file snapshots */
   usedFallback?: boolean;
+  /** Sandbox architecture layers applied */
+  bugBox?: {
+    level: string;
+    appliedLayers: string[];
+    skippedLayers: string[];
+    platform: string;
+  };
 }
 
 /**
@@ -40,13 +48,17 @@ export async function replayArtifact(
   expectedFailure: FailureRecord,
   options: ReplayOptions,
 ): Promise<ReplayResult> {
-  // 1. Create the sandbox workspace
-  const sandbox: SandboxResult = await createSandbox({
-    mode: options.versionMatch,
-    originalWorkingDir: runConfig.working_directory,
-    artifactPath: options.artifactPath,
-    gitCommit: options.gitCommit,
-    gitBranch: options.gitBranch,
+  // 1. Create the sandbox workspace via Bug-Box orchestrator
+  const bugbox: BugBoxResult = await createBugBox({
+    level: options.sandboxLevel || 'workspace',
+    command: runConfig.command,
+    sandboxOptions: {
+      mode: options.versionMatch,
+      originalWorkingDir: runConfig.working_directory,
+      artifactPath: options.artifactPath,
+      gitCommit: options.gitCommit,
+      gitBranch: options.gitBranch,
+    },
   });
 
   try {
@@ -61,8 +73,8 @@ export async function replayArtifact(
     // 3. Re-run the command in the sandbox directory
     const replayConfig: RunConfig = {
       ...runConfig,
+      ...bugbox.runConfigOverrides,
       environment: replayEnv,
-      working_directory: sandbox.workingDirectory,
     };
 
     const result = await executeAndCapture(replayConfig);
@@ -72,11 +84,17 @@ export async function replayArtifact(
       expectedFailure,
       actualStdout: result.stdout,
       actualStderr: result.stderr,
-      replayDirectory: sandbox.workingDirectory,
-      usedFallback: sandbox.usedFallback,
+      replayDirectory: bugbox.sandboxResult.workingDirectory,
+      usedFallback: bugbox.sandboxResult.usedFallback,
+      bugBox: {
+        level: options.sandboxLevel || 'workspace',
+        appliedLayers: bugbox.appliedLayers,
+        skippedLayers: bugbox.skippedLayers,
+        platform: bugbox.capabilities.platform,
+      },
     };
   } finally {
     // 4. Always clean up the sandbox
-    cleanupSandbox(sandbox);
+    bugbox.cleanupFn();
   }
 }

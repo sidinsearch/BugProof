@@ -50,6 +50,12 @@ export interface ReplayJsonInput {
   expectedExitCode: number;
   actualExitCode: number;
   artifactName: string;
+  bugBox?: {
+    level: string;
+    appliedLayers: string[];
+    skippedLayers: string[];
+    platform: string;
+  };
 }
 
 export function formatReplayJson(input: ReplayJsonInput): string {
@@ -62,6 +68,7 @@ export function formatReplayJson(input: ReplayJsonInput): string {
     expected_exit_code: input.expectedExitCode,
     actual_exit_code: input.actualExitCode,
     artifact: input.artifactName,
+    bugBox: input.bugBox,
   }, null, 2);
 }
 

@@ -222,6 +222,7 @@ program
   .description('Replay a .bug artifact to reproduce a failure')
   .argument('<artifact>', 'Path to the .bug artifact directory')
   .option('--version-match <mode>', 'Git checkout mode: strict, current, branch', 'current')
+  .option('--sandbox <level>', 'Sandbox level: workspace, isolated, full', 'workspace')
   .option('--env <var=value>', 'Override environment variables', (v: string, arr: string[]) => {
     arr.push(v);
     return arr;
@@ -287,6 +288,7 @@ program
     const replayResult = await replayArtifact(runConfig, expectedFailure, {
       artifactPath: artifact,
       versionMatch: options.versionMatch,
+      sandboxLevel: options.sandbox,
       envOverrides,
       gitCommit: manifest.captured_on.git_commit,
       gitBranch: manifest.captured_on.git_branch,
@@ -300,6 +302,7 @@ program
         expectedExitCode: expectedFailure.exit_code,
         actualExitCode: replayResult.actualFailure.exit_code,
         artifactName: manifest.name,
+        bugBox: replayResult.bugBox,
       }));
     } else {
       console.log();
@@ -312,6 +315,17 @@ program
       kvLine('Expected exit', String(expectedFailure.exit_code));
       kvLine('Actual exit', String(replayResult.actualFailure.exit_code));
       kvLine('Verdict', verdict.message);
+      
+      if (replayResult.bugBox && replayResult.bugBox.level !== 'workspace') {
+        console.log();
+        console.log(c.bold('  Bug-Box Sandbox'));
+        kvLine('Level', replayResult.bugBox.level);
+        kvLine('Applied', replayResult.bugBox.appliedLayers.join(', ') || 'none');
+        if (replayResult.bugBox.skippedLayers.length > 0) {
+          kvLine('Skipped', c.yellow(replayResult.bugBox.skippedLayers[0] + (replayResult.bugBox.skippedLayers.length > 1 ? '...' : '')));
+        }
+      }
+      
       console.log();
     }
 
