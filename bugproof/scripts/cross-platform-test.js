@@ -46,7 +46,7 @@ async function run() {
   // Create a failing script
   fs.writeFileSync('fail.js', 'console.error("Windows Error!"); process.exit(1);');
   execSync('git add fail.js');
-  execSync('node dist/cli.js capture node fail.js', { stdio: 'inherit' });
+  execSync('node dist/cli.js capture --exclude "*.tgz" node fail.js', { stdio: 'inherit' });
   const allBugFiles = fs.readdirSync(ROOT_DIR).filter(f => f.endsWith('.bug'));
   // Find the most recently modified bug file
   let windowsBugFile = null;
@@ -90,8 +90,8 @@ async function run() {
   console.log('   Initializing dummy git repo for tests...');
   await execRemote(`cd ${REMOTE_DIR} && git init && git config user.name "Tester" && git config user.email "test@example.com" && git add . && git commit -m "Init"`);
 
-  await execRemote(`cd ${REMOTE_DIR} && npm install --production=false`); // install all deps
-  await execRemote(`cd ${REMOTE_DIR} && npm run build`);
+  await execRemote(`cd ${REMOTE_DIR} && npm install --production=false`, true); // install all deps
+  await execRemote(`cd ${REMOTE_DIR} && npm run build`, true);
 
   // 4. Run Linux Test Suite
   console.log('\n🧪 Running Test Suite on Linux...');
@@ -117,7 +117,7 @@ async function run() {
   console.log('\n🐧 Capturing test artifact on Linux...');
   await execRemote(`cd ${REMOTE_DIR} && echo "console.error('Linux Error!'); process.exit(1);" > fail_linux.js`);
   await execRemote(`cd ${REMOTE_DIR} && git add fail_linux.js`);
-  await execRemote(`cd ${REMOTE_DIR} && node dist/cli.js capture node fail_linux.js`);
+  await execRemote(`cd ${REMOTE_DIR} && node dist/cli.js capture --exclude "*.tgz" node fail_linux.js`);
   
   const linuxFilesRaw = await execRemote(`cd ${REMOTE_DIR} && ls -1 *.bug`);
   const linuxBugFile = linuxFilesRaw.stdout.split('\n').find(f => f.trim().endsWith('.bug') && f.trim() !== 'windows.bug');
@@ -162,7 +162,7 @@ async function execRemote(cmd, stream = false) {
     onStderr: stream ? (chunk) => process.stderr.write(chunk.toString('utf8')) : undefined,
   });
   if (result.code !== 0 && !stream) {
-    console.error(`Command failed: ${cmd}\n${result.stderr}`);
+    console.error(`Command failed: ${cmd}\nSTDERR:\n${result.stderr}\nSTDOUT:\n${result.stdout}`);
     throw new Error(`Remote command failed with code ${result.code}`);
   }
   return result;

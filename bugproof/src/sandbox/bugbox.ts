@@ -74,7 +74,9 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
       networkStrategy: 'none',
       processStrategy: 'none',
       resourceStrategy: 'none',
-      runConfigOverrides: {},
+      runConfigOverrides: {
+        working_directory: sandboxResult.workingDirectory,
+      },
       cleanupFn: () => cleanupSandbox(sandboxResult),
     };
   }
@@ -90,11 +92,8 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
   });
 
   // If the sandbox fell back to copying the artifact's files/ snapshot,
-  // those files are now in the workspaceDir. To prevent the replayed command
-  // from modifying the source snapshot, we lock the filesDir read-only.
-  // Wait, if it's a fallback, it copies files from artifact. We should lock it if we
-  // put it in filesDir. But currently sandbox.ts copies to `targetDir`. So it's all in
-  // workspaceDir. We'll lock `filesDir` just in case future logic separates them.
+  // lock the filesDir read-only to prevent the replayed process from
+  // modifying the captured source snapshot.
   if (sandboxResult.usedFallback) {
     lockDirReadOnly(isolatedDir.filesDir);
   }

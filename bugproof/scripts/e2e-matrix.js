@@ -210,15 +210,19 @@ async function captureOnLinux(bug) {
 }
 
 // ── Phase 4: Replay on Windows ──
-function replayOnWindows(bugFilePath) {
-  const cmd = `node dist/cli.js replay "${bugFilePath}" --version-match current`;
+// crossPlatform=true uses --version-match strict to extract the artifact's file snapshot,
+// which ensures the fixture script exists on the target OS regardless of directory layout.
+function replayOnWindows(bugFilePath, crossPlatform = false) {
+  const mode = crossPlatform ? 'strict' : 'current';
+  const cmd = `node dist/cli.js replay "${bugFilePath}" --version-match ${mode}`;
   const output = runLocal(cmd);
   return { output, verdict: checkVerdict(output) };
 }
 
 // ── Phase 5: Replay on Linux ──
-async function replayOnLinux(remoteBugPath) {
-  const cmd = `cd ${REMOTE_DIR} && node dist/cli.js replay "${remoteBugPath}" --version-match current`;
+async function replayOnLinux(remoteBugPath, crossPlatform = false) {
+  const mode = crossPlatform ? 'strict' : 'current';
+  const cmd = `cd ${REMOTE_DIR} && node dist/cli.js replay "${remoteBugPath}" --version-match ${mode}`;
   const result = await runRemote(cmd, true);
   const combinedOutput = result.stdout + '\n' + result.stderr;
   return { output: combinedOutput, verdict: checkVerdict(combinedOutput) };
@@ -273,7 +277,7 @@ async function runMatrix() {
       try {
         const remoteName = await transferWinToLinux(winBug);
         scenario.results.win_to_linux.capture = 'pass';
-        const rl = await replayOnLinux(remoteName);
+        const rl = await replayOnLinux(remoteName, true);
         scenario.results.win_to_linux.replay = 'pass';
         scenario.results.win_to_linux.verdict = rl.verdict;
         log(rl.verdict === 'confirmed' ? '✅' : '⚠️', `  Win→Linux: ${rl.verdict}`);
@@ -296,7 +300,7 @@ async function runMatrix() {
       try {
         const localName = await transferLinuxToWin(linuxBug);
         scenario.results.linux_to_win.capture = 'pass';
-        const rw = replayOnWindows(localName);
+        const rw = replayOnWindows(localName, true);
         scenario.results.linux_to_win.replay = 'pass';
         scenario.results.linux_to_win.verdict = rw.verdict;
         log(rw.verdict === 'confirmed' ? '✅' : '⚠️', `  Linux→Win: ${rw.verdict}`);

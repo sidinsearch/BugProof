@@ -23,7 +23,14 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
     const MAX_BUFFER_SIZE = 1024 * 1024; 
 
     let isTimeout = false;
+    let resolved = false;
     let proc: ChildProcess;
+
+    const safeResolve = (value: { failure: FailureRecord, stdout: string, stderr: string }) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
 
     try {
       proc = spawn(command, args, {
@@ -34,7 +41,7 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
     } catch (err) {
       // Command not found or spawn error
       const errStr = String(err);
-      resolve({
+      safeResolve({
         failure: {
           exit_code: 1,
           signal: null,
@@ -97,7 +104,7 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
         timeout: isTimeout
       };
 
-      resolve({
+      safeResolve({
         failure,
         stdout: stdoutBuffer,
         stderr: stderrBuffer
@@ -109,7 +116,7 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
       const errStr = String(err);
       stderrBuffer += errStr;
       
-      resolve({
+      safeResolve({
         failure: {
           exit_code: 1,
           signal: null,

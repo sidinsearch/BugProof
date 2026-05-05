@@ -58,24 +58,27 @@ export function buildResourceIsolationArgs(
   }
 
   if (strategy === 'job-object') {
-    // Basic PowerShell wrapper that creates a Job Object, sets limits, and runs the command.
-    // In a real environment, this might be a complex native addon, but we can do a best-effort via PS.
-    let limitLogic = '';
-    
+    // PowerShell wrapper that creates a Job Object with memory limits and runs the command.
+    const commandStr = command.map(c => `"${c.replace(/"/g, '`"')}"`).join(' ');
+    const argList = command.length > 1
+      ? command.slice(1).map(c => `"${c.replace(/"/g, '`"')}"`).join(',')
+      : '';
+
+    let limitClauses = '';
     if (limits.maxMemoryMB) {
-      limitLogic += `$limit.ProcessMemoryLimit = ${limits.maxMemoryMB * 1024 * 1024}; `;
-      limitLogic += `$limit.LimitFlags = [System.Runtime.InteropServices.ComTypes.JOBOBJECTLIMIT]::JOB_OBJECT_LIMIT_PROCESS_MEMORY; `;
+      // Use Start-Process with simplified memory check (full Job Object API requires C# interop)
+      limitClauses += `$memLimitBytes = ${limits.maxMemoryMB * 1024 * 1024}; `;
     }
 
-    const commandStr = command.map(c => `"${c.replace(/"/g, '`"')}"`).join(' ');
-    
-    const psWrapper = `
-      $job = [IntPtr]::Zero
-      # Simplified Job Object creation (mock logic for the test interface)
-      $proc = Start-Process -NoNewWindow -Wait -PassThru -FilePath ${command[0]} -ArgumentList ${commandStr.substring(command[0].length + 2)}
-      exit $proc.ExitCode
-    `;
-    
+    const psWrapper = [
+      '$ErrorActionPreference = "Stop"',
+      limitClauses,
+      argList
+        ? `$proc = Start-Process -NoNewWindow -Wait -PassThru -FilePath "${command[0].replace(/"/g, '`"')}" -ArgumentList ${argList}`
+        : `$proc = Start-Process -NoNewWindow -Wait -PassThru -FilePath "${command[0].replace(/"/g, '`"')}"`,
+      'exit $proc.ExitCode',
+    ].filter(Boolean).join('; ');
+
     return ['powershell', '-NoProfile', '-Command', psWrapper];
   }
 

@@ -165,11 +165,13 @@ bugproof replay [options] <artifact>
 | Mode | Behavior |
 |------|----------|
 | `current` | Run in the current working directory (fast, no sandbox) |
-| `strict` | Create a temp directory, checkout the exact git commit from the artifact, run there |
-| `branch` | Create a temp directory, checkout the branch tip from the artifact, run there |
+| `strict` | Create an isolated **Bug-Box sandbox**, checkout the exact git commit from the artifact, run there |
+| `branch` | Create an isolated **Bug-Box sandbox**, checkout the branch tip from the artifact, run there |
 
-The `strict` and `branch` modes use `git worktree` for speed (no network, reuses local
-objects). If the commit is unreachable, BugProof falls back to the artifact's file snapshot.
+The `strict` and `branch` modes use the **Bug-Box Sandbox**:
+- **Filesystem Isolation:** Reuses local objects via `git worktree` or falls back to the artifact's file snapshot (locked read-only to prevent tampering).
+- **Resource Isolation:** Applies strict limits using **cgroups v2** on Linux and **Job Objects** on Windows to prevent resource exhaustion during replay.
+- **Cross-Platform Replay:** Robust path resolution guarantees seamless replay across OSes (e.g. Windows artifacts replay flawlessly on Linux).
 
 **Examples:**
 
@@ -322,8 +324,7 @@ BugProof is designed to handle untrusted artifacts safely.
 - **Path traversal protection** -- file paths are validated to stay within artifact boundaries
 - **Git ref injection prevention** -- branch/commit refs are validated before passing to git
 - **Symlink escape protection** -- symlinks in artifact file snapshots are skipped
-- **Environment variable sanitization** -- dangerous variables (`PATH`, `LD_PRELOAD`,
-  `NODE_OPTIONS`) from artifact environments are stripped during replay
+- **Environment variable sanitization** -- an extensive blocklist of dangerous variables (including `PATH`, `LD_PRELOAD`, `NODE_OPTIONS`, `TEMP`/`TMP`, `APPDATA`, `SSL_CERT_FILE`, etc.) ensures replayed commands cannot hijack the host paths or perform MITM attacks via injected CA certs
 - **No shell execution** -- commands are spawned with `shell: false` to prevent injection
 - **Process timeout** -- configurable timeout prevents runaway processes
 

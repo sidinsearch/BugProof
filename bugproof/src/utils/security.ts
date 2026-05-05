@@ -51,6 +51,15 @@ export const DANGEROUS_ENV_VARS = new Set([
   'PYTHONPATH',
   'RUBYLIB',
   'PERL5LIB',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'XDG_RUNTIME_DIR',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'CURL_CA_BUNDLE',
 ]);
 
 /**

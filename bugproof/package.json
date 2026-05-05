@@ -15,7 +15,8 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write 'src/**/*.ts'",
-    "cli": "tsx src/cli.ts"
+    "cli": "tsx src/cli.ts",
+    "test:e2e": "node scripts/e2e-matrix.js"
   },
   "keywords": [
     "bug",

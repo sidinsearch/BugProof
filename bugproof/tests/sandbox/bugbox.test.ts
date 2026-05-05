@@ -75,7 +75,9 @@ describe('Bug-Box Orchestrator', () => {
     expect(result.appliedLayers).toHaveLength(0);
     expect(result.skippedLayers).toHaveLength(0);
     expect(result.networkStrategy).toBe('none');
-    expect(result.runConfigOverrides).toEqual({});
+    expect(result.runConfigOverrides).toEqual({
+      working_directory: '/cwd',
+    });
     
     expect(createSandbox).toHaveBeenCalledWith(baseOpts.sandboxOptions);
     

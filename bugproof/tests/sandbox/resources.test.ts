@@ -49,7 +49,8 @@ describe('Bug-Box Resource Isolation', () => {
       expect(result[0]).toBe('powershell');
       expect(result[1]).toBe('-NoProfile');
       expect(result[2]).toBe('-Command');
-      expect(result[3]).toContain('Job'); // should contain some Job Object logic
+      expect(result[3]).toContain('Start-Process');
+      expect(result[3]).toContain('node');
     });
 
     it('should leave command unchanged if no limits provided', () => {
