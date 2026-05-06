@@ -10,6 +10,16 @@ import { generateExactFingerprint, extractErrorPatterns } from '../utils/fingerp
 export async function executeAndCapture(config: RunConfig): Promise<{ failure: FailureRecord, stdout: string, stderr: string }> {
   return new Promise((resolve) => {
     const startTime = Date.now();
+    
+    // Define resolveExecutable first, before using it
+    const resolveExecutable = (cmd: string): string => {
+      const normalized = cmd.trim().toLowerCase();
+      if (normalized === 'node' || normalized === 'node.exe') {
+        return process.execPath;
+      }
+      return cmd;
+    };
+    
     const command = resolveExecutable(config.command[0]);
     const args = config.command.slice(1);
     
@@ -81,15 +91,6 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
           stderrBuffer += chunk;
         }
       });
-    }
-
-    function resolveExecutable(command: string): string {
-      const normalized = command.trim().toLowerCase();
-      if (normalized === 'node' || normalized === 'node.exe') {
-        return process.execPath;
-      }
-
-      return command;
     }
 
     proc.on('close', (code, signal) => {
