@@ -66,9 +66,12 @@ export async function packageArtifact(
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
 
-    // 3. Update manifest with actual file stats
-    options.manifest.files_count = fileEntries.length;
-    options.manifest.files_size_bytes = totalSize;
+    // 3. Create manifest with actual file stats (immutable: don't mutate input)
+    const manifestWithStats = {
+      ...options.manifest,
+      files_count: fileEntries.length,
+      files_size_bytes: totalSize,
+    };
 
     // 4. Build a sanitized RunConfig (strip secret values from environment)
     const sanitizedEnv: Record<string, string> = {};
@@ -82,7 +85,7 @@ export async function packageArtifact(
     const safeRunConfig: RunConfig = { ...options.runConfig, environment: sanitizedEnv };
 
     // 5. Write JSON schema files
-    fs.writeFileSync(path.join(tempDir, 'manifest.json'), JSON.stringify(options.manifest, null, 2));
+    fs.writeFileSync(path.join(tempDir, 'manifest.json'), JSON.stringify(manifestWithStats, null, 2));
     fs.writeFileSync(path.join(tempDir, 'env.schema.json'), JSON.stringify(options.envSchema, null, 2));
     fs.writeFileSync(path.join(tempDir, 'metadata.json'), JSON.stringify(options.metadata, null, 2));
     fs.writeFileSync(path.join(tempDir, 'run.json'), JSON.stringify(safeRunConfig, null, 2));

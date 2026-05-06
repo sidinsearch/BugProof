@@ -1,0 +1,44 @@
+Windows Registry Editor Version 5.00
+
+; BugProof .bug file association for Windows
+; This script associates .bug files with BugProof CLI and assigns an icon
+
+[HKEY_CLASSES_ROOT\.bug]
+@="BugProof.Artifact"
+
+[HKEY_CLASSES_ROOT\.bug\ShellNew]
+"FileName"=""
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact]
+@="BugProof Bug Artifact"
+"AppUserModelID"="BugProof.CLI"
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact\DefaultIcon]
+@="C:\\Program Files\\BugProof\\assets\\icon.ico,0"
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact\shell]
+@=""
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact\shell\open]
+@="Replay"
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact\shell\open\command]
+@="cmd.exe /c \"bugproof replay \"%1\"\""
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact\shell\inspect]
+@="Inspect"
+
+[HKEY_CLASSES_ROOT\BugProof.Artifact\shell\inspect\command]
+@="cmd.exe /c \"bugproof inspect \"%1\" && pause\""
+
+; Add BugProof to PATH via registry (optional, requires admin)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment]
+; Note: User must manually add BugProof bin to PATH or run: npm link
+
+; Right-click context menu
+[HKEY_CLASSES_ROOT\*\shell\BugProof Capture]
+@="Capture with BugProof"
+"Icon"="C:\\Program Files\\BugProof\\assets\\icon.ico,0"
+
+[HKEY_CLASSES_ROOT\*\shell\BugProof Capture\command]
+@="cmd.exe /c \"bugproof capture -- \"%1\"\""
