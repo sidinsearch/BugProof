@@ -32,7 +32,9 @@ describe('Path Utilities', () => {
       const originalPath = 'D:\\BugProof\\dummy-project\\bugs\\java\\J1NullPointer.java';
 
       const mapped = mapToReplayEnvironment(originalPath, tempRoot);
-      expect(mapped).toBe(path.join(tempRoot, 'BugProof\\dummy-project\\bugs\\java\\J1NullPointer.java'));
+      // Use posix path for consistent cross-platform testing
+      const expected = path.posix.join(tempRoot, 'BugProof/dummy-project/bugs/java/J1NullPointer.java');
+      expect(mapped).toBe(expected);
     });
   });
 });
