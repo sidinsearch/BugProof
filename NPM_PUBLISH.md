@@ -1,148 +1,252 @@
-# NPM Publishing Guide
+# NPM Publishing Guide — Dual Registry Strategy
 
-BugProof is published to both [npmjs.com](https://www.npmjs.com/package/bugproof) and [GitHub Packages](https://github.com/sidinsearch/BugProof/packages).
+BugProof is published to both **npmjs.com** (public) and **GitHub Packages** (GitHub-hosted) automatically via GitHub Actions.
 
-## Prerequisites
+## 📦 Publishing Registries
 
-1. **npm account** — Sign up at https://www.npmjs.com/signup
-2. **npm login** — Run `npm login` locally to authenticate
-3. **npm token** — Generate at https://www.npmjs.com/settings/tokens
-4. **GitHub token** — Generate at https://github.com/settings/tokens
-
-## Publishing Workflow
-
-### Manual Release (Local)
+### npmjs.com (Primary - Public Registry)
 
 ```bash
-# 1. Ensure everything is committed
-git status
-
-# 2. Run the release script
-npm run release
-
-# This will:
-# - Run test suite
-# - Run linter
-# - Build TypeScript
-# - Create git tag (v0.1.0)
-# - Push tag to GitHub
-
-# 3. Publish to npm
-npm publish
-
-# 4. Publish to GitHub Packages (optional)
-npm publish --registry https://npm.pkg.github.com
+npm install -g bugproof
 ```
 
-### Automated Release (GitHub Actions)
+- **Package name**: `bugproof` (unscoped)
+- **URL**: https://www.npmjs.com/package/bugproof
+- **Authentication**: NPM_TOKEN from npmjs.com
+- **Best for**: Public distribution, maximum discoverability
 
-When you push a git tag matching `v*` pattern, GitHub Actions automatically:
-1. Checks out code
-2. Installs dependencies
-3. Runs tests and linter
-4. Builds TypeScript
-5. Publishes to npm (requires `NPM_TOKEN` secret)
-6. Publishes to GitHub Packages (uses `GITHUB_TOKEN`)
-7. Creates a GitHub Release
+### GitHub Packages (Secondary - GitHub-Hosted Registry)
 
-**Setup:**
-1. Add `NPM_TOKEN` secret to GitHub repository settings:
-   - Go to Settings → Secrets and variables → Actions
-   - New repository secret → `NPM_TOKEN` → paste npm token
-2. Commit `.github/workflows/publish.yml`
-3. Push a tag: `git push origin v0.2.0`
+```bash
+npm install -g @sidinsearch/bugproof --registry https://npm.pkg.github.com
+```
 
-## Versioning
+- **Package name**: `@sidinsearch/bugproof` (scoped)
+- **URL**: https://npm.pkg.github.com/@sidinsearch/bugproof
+- **Authentication**: GITHUB_TOKEN (auto-provided)
+- **Best for**: GitHub organization, tighter integration
 
-BugProof follows [Semantic Versioning](https://semver.org/):
-- **MAJOR** — Breaking API changes
-- **MINOR** — New features (backward compatible)
-- **PATCH** — Bug fixes
+## 🔐 Prerequisites
 
-Examples:
-- `0.1.0` — Initial release
-- `0.2.0` — Add new feature
-- `0.2.1` — Fix bug
-- `1.0.0` — First stable release
+### For npmjs.com Publishing
 
-## Publishing Checklist
+1. **Create npm account**: https://www.npmjs.com/signup
+2. **Generate npm token**:
+   - https://www.npmjs.com/settings/tokens
+   - Type: "Automation" (recommended for CI/CD)
+   - Permissions: Read & Write
+3. **Add to GitHub Secrets**:
+   - Go to Repo Settings → Secrets and variables → Actions
+   - New secret → Name: `NPM_TOKEN` → Paste token
+4. **⚠️ IMPORTANT**: Never commit or share the token!
 
-Before releasing:
+### For GitHub Packages Publishing
+
+- ✅ **Automatic** — GITHUB_TOKEN is provided by GitHub Actions
+- ✅ No additional setup needed
+- Repository must have public visibility or GitHub org membership
+
+## 📋 Publishing Workflow
+
+### Automated (Recommended)
+
+Push a git tag to trigger automatic publication:
+
+```bash
+# 1. Update version in package.json (or use npm version)
+npm version patch  # or minor/major
+
+# 2. Update CHANGELOG.md with release notes
+
+# 3. Commit changes
+git add package.json CHANGELOG.md
+git commit -m "chore: bump to v0.1.1"
+
+# 4. Create and push tag
+git tag -a v0.1.1 -m "Release v0.1.1"
+git push origin main
+git push origin v0.1.1
+
+# 5. GitHub Actions automatically:
+#    → Runs tests
+#    → Builds TypeScript
+#    → Publishes to npmjs.com (using NPM_TOKEN)
+#    → Publishes to GitHub Packages (using GITHUB_TOKEN)
+#    → Creates GitHub Release
+```
+
+**Monitor progress**: https://github.com/sidinsearch/BugProof/actions
+
+### Manual (Testing/Development)
+
+```bash
+# Test locally without publishing (dry-run)
+npm publish --dry-run
+
+# Publish to npmjs.com (requires npm login or NPM_TOKEN in .npmrc)
+npm publish
+
+# Publish to GitHub Packages (requires GitHub token in .npmrc)
+npm config set @sidinsearch:registry=https://npm.pkg.github.com/
+npm config set //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+npm publish
+```
+
+## 📚 Key Differences: npmjs vs GitHub Packages
+
+| Feature | npmjs.com | GitHub Packages |
+|---------|-----------|-----------------|
+| Package name | `bugproof` (unscoped) | `@sidinsearch/bugproof` (scoped) |
+| Public discovery | ✅ Searchable on npmjs.com | ❌ Only on GitHub |
+| Authentication | NPM_TOKEN (personal) | GITHUB_TOKEN (org/repo) |
+| Registry URL | Default (npmjs.org) | Must specify in .npmrc |
+| Best for | General public | GitHub organization |
+| Installation | `npm install -g bugproof` | `npm install -g @sidinsearch/bugproof --registry https://npm.pkg.github.com` |
+
+**See [REGISTRY_SETUP.md](./REGISTRY_SETUP.md) for detailed comparison**
+
+## 🚀 Release Checklist
+
+Before publishing:
 
 - [ ] All tests pass: `npm test`
 - [ ] Linting passes: `npm run lint`
 - [ ] Build succeeds: `npm run build`
-- [ ] CHANGELOG.md updated with new version
-- [ ] package.json version updated (if not automatic)
-- [ ] README.md docs are current
-- [ ] No uncommitted changes: `git status`
-- [ ] Create git tag: `git tag -a v0.X.Y -m "Release v0.X.Y"`
+- [ ] CHANGELOG.md updated with new version section
+- [ ] package.json version matches release version
+- [ ] README.md docs are up-to-date
+- [ ] Git working directory clean: `git status`
+- [ ] NPM_TOKEN secret configured in GitHub
 
-## npm Registry Configuration
+## 🔧 GitHub Actions Workflow
 
-To publish consistently, ensure `.npmrc` is configured:
+Our `.github/workflows/publish.yml` automatically:
 
-```ini
-# ~/.npmrc (local)
-registry=https://registry.npmjs.org/
-//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
-
-# For GitHub Packages (optional)
-@sidinsearch:registry=https://npm.pkg.github.com/
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+```yaml
+1. Checkout code
+2. Setup Node.js 18
+3. Install dependencies (npm ci)
+4. Run tests (npm test)
+5. Run linter (npm lint)
+6. Build (npm build)
+7. Publish to npmjs.com
+   - npm config set registry https://registry.npmjs.org/
+   - npm publish (with NPM_TOKEN)
+8. Publish to GitHub Packages
+   - npm config set @sidinsearch:registry=https://npm.pkg.github.com/
+   - npm publish (with GITHUB_TOKEN)
+9. Create GitHub Release
+   - Includes links to both registries
+   - Links to CHANGELOG.md
 ```
 
-## Installation from npm
+## 📝 Versioning Strategy
 
-After publishing, users can install with:
+BugProof follows [Semantic Versioning](https://semver.org/):
 
+- **0.1.0** — Current: Initial release
+- **0.2.0** — Next: New features (npm polish)
+- **0.3.0** — Cloud storage integration
+- **1.0.0** — Stable release
+
+| Change | Version | When |
+|--------|---------|------|
+| MAJOR | 1.0.0 | Breaking API changes |
+| MINOR | 0.2.0 | New features (backward compatible) |
+| PATCH | 0.1.1 | Bug fixes |
+
+## 🛠️ Troubleshooting
+
+### "403 Forbidden" on npm publish
+
+**Problem**: NPM_TOKEN invalid or expired
+
+**Solution**:
+1. Go to https://www.npmjs.com/settings/tokens
+2. Check if token still exists
+3. If expired, generate new token
+4. Update GitHub secret with new token
+
+### Package not appearing on npmjs.com
+
+**Problem**: Delay in registry sync
+
+**Solution**: Wait 5-10 minutes, then:
 ```bash
-# Global install (recommended for CLI)
-npm install -g bugproof
-
-# Local install
-npm install bugproof
+npm view bugproof@0.1.1
+# Or check: https://www.npmjs.com/package/bugproof
 ```
 
-## Troubleshooting
+### "Package @sidinsearch/bugproof not found"
 
-**"403 Forbidden" when publishing**
-- Verify you're logged in: `npm whoami`
-- Check npm token is valid and not expired
-- Ensure package name is unique (or you have publish rights)
+**Problem**: GitHub Packages requires explicit registry
 
-**"Package size exceeds limit"**
-- Check `.npmignore` is excluding unnecessary files
-- Verify `files` field in package.json
-- Run `npm pack` to see what will be published
+**Solution**: Include registry URL:
+```bash
+npm install @sidinsearch/bugproof --registry https://npm.pkg.github.com
+# Or add to .npmrc:
+@sidinsearch:registry=https://npm.pkg.github.com/
+```
 
-**"Version already published"**
-- Increment version in package.json
-- Create new git tag
-- Re-run publish
+### Duplicate version error
 
-## Package Contents
+**Problem**: Attempting to publish same version twice
 
-The npm package includes:
-- `dist/` — Compiled JavaScript (ES modules)
-- `assets/` — Icon files for file association
-- `scripts/` — Post-install setup scripts
-- `README.md` — Documentation
-- `CHANGELOG.md` — Version history
-- `LICENSE` — MIT license
+**Solution**: Increment version first:
+```bash
+npm version patch
+git add package.json CHANGELOG.md
+git commit -m "chore: bump version"
+git tag -a v0.1.1 -m "Release v0.1.1"
+git push origin main --tags
+```
 
-Everything else (tests, docs, dev configs) is excluded via `.npmignore`.
+## 📊 Package Contents
 
-## Monitoring
+The published npm package includes:
 
-After publishing:
-- Check npm registry: https://www.npmjs.com/package/bugproof
-- Check GitHub Packages: https://github.com/sidinsearch/BugProof/packages
-- Monitor for issues: https://github.com/sidinsearch/BugProof/issues
+```
+dist/                                # Compiled JavaScript
+├── cli.js                          # CLI entry point
+├── capture/, replay/, diff/        # Core engines
+├── sandbox/                        # Sandbox system
+└── utils/, types/                  # Utilities & types
 
-## Links
+assets/                            # Icon files
+├── icon-16x16.png
+├── icon-32x32.png
+└── icon-512x512.png
+
+scripts/
+├── postinstall.cjs               # Auto-setup script
+└── bugproof-file-association-*.{sh,reg}
+
+README.md, CHANGELOG.md, LICENSE
+```
+
+**Excluded** (via .npmignore):
+- Tests
+- Source TypeScript
+- Development dependencies
+- Build configs
+- CI/CD files
+
+## 🔗 Useful Links
 
 - **npm package**: https://www.npmjs.com/package/bugproof
+- **GitHub Packages**: https://github.com/sidinsearch/BugProof/packages
 - **GitHub repo**: https://github.com/sidinsearch/BugProof
 - **Issues**: https://github.com/sidinsearch/BugProof/issues
 - **Discussions**: https://github.com/sidinsearch/BugProof/discussions
+
+## 📚 Documentation Files
+
+- [SECURE_TOKEN_SETUP.md](./SECURE_TOKEN_SETUP.md) — Token security & setup
+- [REGISTRY_SETUP.md](./REGISTRY_SETUP.md) — Registry differences explained
+- [GETTING_STARTED.md](./GETTING_STARTED.md) — User installation guide
+- [CHANGELOG.md](./CHANGELOG.md) — Version history
+- [NPM_RELEASE_SETUP.md](./NPM_RELEASE_SETUP.md) — Quick reference
+
+---
+
+**Next**: Add NPM_TOKEN secret to GitHub, then push a tag to publish!
