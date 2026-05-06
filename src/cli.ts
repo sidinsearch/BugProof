@@ -7,11 +7,11 @@ import { executeAndCapture } from './capture/engine.js';
 import { packageArtifact } from './capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from './utils/secrets.js';
 import { getGitContext } from './utils/git.js';
-import { filterByExcludePatterns } from './utils/exclude.js';
 import { formatCaptureJson, formatReplayJson, formatInspectJson } from './utils/json-output.js';
 import { extractZip } from './utils/archive.js';
 import { diffArtifacts, ArtifactSnapshot } from './diff/engine.js';
 import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.js';
+import { FailureRecord } from './types/failure.js';
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
 import { banner, success, warn, error, info, kvLine, c, icons } from './utils/ui.js';
@@ -262,7 +262,7 @@ program
 
       let manifest: ArtifactManifest;
       let runConfig: RunConfig;
-      let expectedFailure: any;
+      let expectedFailure: FailureRecord;
 
       try {
         const manifestRaw = fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8');

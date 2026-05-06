@@ -1,7 +1,7 @@
 import { RunConfig } from '../types/artifact.js';
 import { FailureRecord } from '../types/failure.js';
 import { executeAndCapture } from '../capture/engine.js';
-import { createBugBox, BugBoxOptions, BugBoxResult } from '../sandbox/bugbox.js';
+import { createBugBox, BugBoxResult } from '../sandbox/bugbox.js';
 import { sanitizeArtifactEnvironment } from '../utils/security.js';
 
 export interface ReplayOptions {

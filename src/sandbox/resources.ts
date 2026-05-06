@@ -59,7 +59,6 @@ export function buildResourceIsolationArgs(
 
   if (strategy === 'job-object') {
     // PowerShell wrapper that creates a Job Object with memory limits and runs the command.
-    const commandStr = command.map(c => `"${c.replace(/"/g, '`"')}"`).join(' ');
     const argList = command.length > 1
       ? command.slice(1).map(c => `"${c.replace(/"/g, '`"')}"`).join(',')
       : '';
