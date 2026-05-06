@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "postinstall": "node scripts/postinstall.cjs",
+    "prepublishOnly": "npm run build && npm run test && npm run lint",
     "dev": "tsx watch src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -18,7 +19,8 @@
     "format": "prettier --write 'src/**/*.ts'",
     "cli": "tsx src/cli.ts",
     "test:e2e": "node scripts/e2e-matrix.js",
-    "test:comprehensive": "node scripts/comprehensive-test.js"
+    "test:comprehensive": "node scripts/comprehensive-test.js",
+    "release": "node scripts/release.cjs"
   },
   "keywords": [
     "bug",
@@ -54,6 +56,16 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "files": [
+    "dist",
+    "assets",
+    "scripts/bugproof-file-association-*.sh",
+    "scripts/bugproof-file-association-*.reg",
+    "scripts/postinstall.cjs",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "directories": {
     "doc": "docs"
   },
