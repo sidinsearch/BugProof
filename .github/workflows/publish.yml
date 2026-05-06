@@ -11,25 +11,52 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check for core package changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse "${GITHUB_SHA}^" >/dev/null 2>&1; then
+            changed_files=$(git diff --name-only "${GITHUB_SHA}^" "${GITHUB_SHA}")
+          else
+            changed_files=$(git show --name-only --format= "${GITHUB_SHA}")
+          fi
+
+          echo "Changed files:"
+          printf '%s\n' "$changed_files"
+
+          if printf '%s\n' "$changed_files" | grep -Eq '^(src/|scripts/|tests/|package.json|package-lock.json|tsconfig.json|jest.config.js|assets/|dummy-project/bugs/)'; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "No release-relevant files changed; skipping publish."
+          fi
       
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.publish == 'true'
         with:
           node-version: '18'
       
       - name: Install dependencies
+        if: steps.changes.outputs.publish == 'true'
         run: npm ci
       
       - name: Run tests
+        if: steps.changes.outputs.publish == 'true'
         run: npm test
       
       - name: Run linter
+        if: steps.changes.outputs.publish == 'true'
         run: npm run lint
       
       - name: Build
+        if: steps.changes.outputs.publish == 'true'
         run: npm run build
       
       # Step 1: Publish to npmjs.com (public registry)
       - name: Publish to npmjs
+        if: steps.changes.outputs.publish == 'true'
         run: |
           npm config set registry https://registry.npmjs.org/
           npm publish
@@ -38,6 +65,7 @@ jobs:
       
       # Step 2: Publish to GitHub Packages (GitHub-hosted registry)
       - name: Publish to GitHub Packages
+        if: steps.changes.outputs.publish == 'true'
         run: |
           npm config set @sidinsearch:registry=https://npm.pkg.github.com/
           npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
@@ -47,6 +75,7 @@ jobs:
       
       # Step 3: Create GitHub Release
       - name: Create GitHub Release
+        if: steps.changes.outputs.publish == 'true'
         uses: softprops/action-gh-release@v1
         with:
           body: |

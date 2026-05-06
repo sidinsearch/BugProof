@@ -245,6 +245,12 @@ npm run build
 npm test
 ```
 
+## CI and Releases
+
+- `push` and `pull_request` CI runs only for core paths such as `src/`, `scripts/`, `tests/`, `package.json`, `tsconfig.json`, and `assets/`.
+- Docs-only edits like `README.md` do not start the CI workflow.
+- Publishing to npmjs.com and GitHub Packages runs only on version tags like `v0.1.0`.
+
 ## License
 
 MIT
