@@ -4,245 +4,123 @@
 >
 > Capture a backend/CLI bug into a portable `.bug` artifact that anyone can run locally to reproduce the issue instantly.
 
+```
+Bug = Code + Inputs + Environment + Execution Context
+```
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Key Features
 
-- 🐛 **Portable bug artifacts** — `.bug` files reproduce bugs exactly, anywhere
-- 🔄 **Instant reproduction** — no "works on my machine" confusion
-- 📦 **Self-contained** — captures code, environment, inputs, execution context
-- 🚀 **Developer-first** — CLI tool, designed for engineers
-- 🏗️ **Lightweight** — not a debugger, not a Docker replacement
+- 🚀 **Portable bug artifacts** — `.bug` files reproduce bugs exactly, anywhere
+- 🛠️ **Instant reproduction** — no "works on my machine" confusion
+- 🔒 **Security First** — automatic secret redaction and sandbox isolation
+- 🐧🪟 **Cross-Platform** — capture on Windows, replay on Linux (and vice versa)
+- 📊 **CI-Ready** — structured JSON output for automated regression checks
 
-## What BugProof IS & ISN'T
+---
 
-| Category | BugProof | WinDbg | Replay.io | Jam.dev | BugZoo |
-|----------|----------|--------|-----------|---------|--------|
-| Debugger | ❌ | ✅ | — | — | — |
-| Replay tool | ❌ | — | ✅ | ✅ | — |
-| Bug reporting | ❌ | — | ✅ | ✅ | — |
-| **Reproducible artifacts** | ✅ | — | — | — | ~ |
-| **Lightweight** | ✅ | — | — | — | — |
-| **Backend/CLI focused** | ✅ | — | — | — | — |
+## Quick Start
 
-## The Problem
+### 1. Install
 
-Developers waste time on:
-- ❌ "Works on my machine" when it doesn't for users
-- ❌ Missing environment details in bug reports
-- ❌ Incomplete reproduction steps
-- ❌ Guessing at root cause
-
-**Current flow:**
-```
-User → bug report → logs → guess → retry → repeat
-```
-
-**BugProof flow:**
-```
-User → /bugproof capture → .bug artifact
-Dev  → bugproof run file.bug → reproduce instantly
-```
-
-## How It Works
-
-### 1. Capture the bug
+**Requirements:** Node.js 18+ and Git.
 
 ```bash
-bugproof capture python app.py --arg1 value --arg2 value
+git clone https://github.com/sidinsearch/BugProof.git
+cd BugProof
+npm install
+npm run build
+npm link
 ```
 
-Captures:
-- ✅ Command + arguments
-- ✅ Environment (sanitized)
-- ✅ Required files/working directory
-- ✅ Error output + fingerprint
+### 2. Capture a bug
 
-### 2. Package it
-
-```
-.bug/
-├── manifest.json
-├── env.schema.json
-├── files/
-├── run.sh
-├── failure.json
-└── metadata.json
-```
-
-### 3. Share with team
+Run a failing command through BugProof. It records everything needed to reproduce it:
 
 ```bash
-bugproof run user-reported-bug.bug
+bugproof capture -- python app.py
 ```
 
-Output:
-```
-Reproducing: python app.py --arg1 value --arg2 value
-Error: [exact same error as reported]
-Duration: 2.3s
+### 3. Replay & Verify
+
+Share the `.bug` artifact with anyone. They can reproduce the exact failure instantly:
+
+```bash
+bugproof replay my-bug.bug
+# => REPRODUCTION CONFIRMED
 ```
 
 ---
 
-## Development
+## Commands
 
-This repo uses **gstack** for AI-assisted development with structured methodology.
-
-### Quick Start
-
-#### 1. Install gstack (all platforms)
-
-**macOS/Linux:**
-```bash
-./setup-gstack-all-platforms.sh
-```
-
-**Windows:**
-```bash
-setup-gstack-all-platforms.bat
-```
-
-#### 2. Set up GBrain (persistent memory)
+### `capture`
+Runs a command, records its failure, snapshots git-tracked source files, and packages everything into a `.bug` artifact.
 
 ```bash
-/setup-gbrain
+bugproof capture -n auth-crash -d "Login fails when session expires" -- node server.js
 ```
 
-#### 3. Start planning
+### `replay`
+Opens a `.bug` artifact and re-executes the captured command in an isolated **Bug-Box sandbox**.
 
 ```bash
-/office-hours
+# Replay at the exact captured commit
+bugproof replay --version-match strict my-bug.bug
 ```
 
-### Available gstack Skills
+### `inspect`
+Prints the contents of a `.bug` artifact (manifest, environment schema, failure logs) without execution.
 
-| Phase | Skill | Purpose |
-|-------|-------|---------|
-| **Plan** | `/office-hours` | Product interrogation (6 forcing questions) |
-| | `/plan-ceo-review` | Strategic scope validation |
-| | `/plan-eng-review` | Architecture lock-in |
-| **Build** | `/design-*` | Design system, mockups, HTML |
-| **Review** | `/review` | Find production bugs + auto-fix |
-| | `/codex` | Independent OpenAI review |
-| **Test** | `/qa` | Live browser testing |
-| | `/cso` | Security audit (OWASP + STRIDE) |
-| **Ship** | `/ship` | Merge → test → PR |
-| | `/land-and-deploy` | Merge → deploy → verify |
-| **Debug** | `/investigate` | Root-cause debugging |
-
-### Platform Support
-
-Jump between platforms seamlessly — gstack auto-detects:
-
-```
-Claude Code  ←→  OpenCode  ←→  Cursor  ←→  Antigravity  ←→  OpenClaw
-```
-
-All context syncs via GBrain automatically (if configured).
-
-### Workflow
-
-```bash
-/office-hours              # Plan the feature
-/plan-eng-review          # Lock architecture
-[implement]
-/review                   # Code review
-/qa https://staging...    # Live testing
-/ship                     # Merge & PR
-```
-
----
-
-## Docs
-
-| Doc | Purpose |
-|-----|---------|
-| [Idea.md](./Idea.md) | Product vision & positioning |
-| [CLAUDE.md](./CLAUDE.md) | AI development guidelines & gstack setup |
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | Development workflow & contributor guide |
-| [docs/CONTEXT_MEMORY.md](./docs/CONTEXT_MEMORY.md) | Context preservation across platforms |
-| [.env.example](./.env.example) | Environment configuration template |
+### `diff`
+Compares two `.bug` artifacts side by side to show changes in failure patterns or environment.
 
 ---
 
 ## Architecture
 
+BugProof is built for speed and security with zero runtime dependencies (except Commander.js).
+
 ```
-BugProof/
-├── src/                   # Source code
-│   ├── cli/              # CLI entry point
-│   ├── capture/          # Bug capture logic
-│   ├── package/          # .bug artifact packaging
-│   ├── replay/           # Bug reproduction runner & verdict logic
-│   └── sandbox/          # Bug-Box isolation (cgroups, Job Objects, filesystem)
-├── tests/                # Test suite
-├── docs/                 # Documentation
-├── DESIGN.md             # Product design (auto-generated by /office-hours)
-├── ARCHITECTURE.md       # System design (auto-generated by /plan-eng-review)
-└── package.json         # Dependencies
+src/
+├── cli.ts                  # CLI Entry & Command definitions
+├── capture/                # Capture engine & artifact packager
+├── replay/                 # Replay engine & sandbox orchestration
+├── diff/                   # Artifact comparison logic
+├── sandbox/                # Bug-Box (cgroups/JobObjects) isolation
+└── utils/                  # Fingerprinting, Secrets, Git, Security
 ```
 
 ---
 
-## Status
+## Security & Isolation
 
-- 🔨 **Status:** In planning phase with gstack
-- 📋 **Active work:** Use `/office-hours` to start
-- 👥 **Team:** Solo + AI-assisted (via gstack)
-- 📈 **Release:** TBD (depends on planning phase)
+- **Secrets Redaction**: Automatic detection and masking of `API_KEY`, `TOKEN`, `PASSWORD`, etc.
+- **Environment Sanitization**: Blocklist of dangerous variables (`LD_PRELOAD`, `NODE_OPTIONS`) to prevent hijack.
+- **Bug-Box Sandbox**: 
+  - **Linux**: cgroups v2 resource limits.
+  - **Windows**: Job Objects resource limits.
+  - **Filesystem**: `git worktree` isolation to prevent tampering with local source.
+
+---
+
+## Roadmap
+
+- [x] v0.1: CLI core (Capture/Replay/Diff)
+- [ ] v0.2: `npm install -g` support & Docker sandbox fallback
+- [ ] v0.3: Bug sharing (artifact push/pull)
+- [ ] v0.4: Language-specific dependency detection
 
 ---
 
-## Stack
+## Contributing
 
-- **Language:** TypeScript/Node.js
-- **CLI:** Commander.js
-- **Packaging:** Tarball (.bug format)
-- **Testing:** Jest
-- **CI/CD:** GitHub Actions
-- **AI Development:** gstack (23 specialized skills)
-- **Memory:** GBrain (persistent knowledge across sessions)
-
----
+```bash
+npm test                # Run test suite (12 suites, 67 tests)
+npm run test:coverage   # Verify 80%+ coverage
+```
 
 ## License
 
-MIT — Free forever. Use, modify, share.
-
----
-
-## Getting Help
-
-1. **Start here:** [CLAUDE.md](./CLAUDE.md) — how gstack works
-2. **Development guide:** [CONTRIBUTING.md](./CONTRIBUTING.md) — workflow & setup
-3. **Setup details:** [.gstack/README.md](./.gstack/README.md) — gstack configuration
-4. **gstack docs:** https://github.com/garrytan/gstack
-5. **Questions?** Open a GitHub issue
-
----
-
-## Next Steps
-
-### For Developers
-
-1. Clone: `git clone <repo>`
-2. Setup: `.gstack/setup.sh` (macOS/Linux) or `.gstack\setup.bat` (Windows)
-3. Initialize GBrain: `/setup-gbrain`
-4. Plan: `/office-hours`
-
-### For Users (when released)
-
-```bash
-npm install -g bugproof
-
-# Capture a bug
-bugproof capture python app.py --args
-
-# Reproduce a bug
-bugproof run bug.bug
-```
-
----
-
-**Made with gstack + GBrain + Claude**
-
-Executable bugs, not bug reports. 🚀
+MIT

@@ -24,9 +24,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 coverage/
-bugproof/dist/
-bugproof/build/
-bugproof/tsconfig.tsbuildinfo
+dist/
+build/
+tsconfig.tsbuildinfo
 docs/
 .gstack-checkpoint.txt
 
