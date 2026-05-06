@@ -42,10 +42,10 @@ ecc-install-state.json
 # Other AI harness state folders
 .gemini/
 .opencode/
-.claude/state/
-.agents/state/
-.gstack/state/
-.gstack/.gstack/
+.claude/
+.agents/
+.gstack/
+.antigravity/
 .gstack-worktrees/
 
 # --------------------------------------------------------------------
