@@ -15,11 +15,8 @@ import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
 import { banner, success, warn, error, info, kvLine, c, icons } from './utils/ui.js';
-import { registerAssociationsSilently } from './utils/associations.js';
 
 const VERSION = '0.1.0';
-
-registerAssociationsSilently();
 
 const program = new Command();
 
@@ -27,6 +24,10 @@ program
   .name('bugproof')
   .description('Executable bug artifacts \u2014 portable, reproducible bug reports')
   .version(VERSION);
+
+program.showHelpAfterError();
+program.showSuggestionAfterError();
+program.addHelpCommand('help [command]', 'Display help for command');
 
 // ─── CAPTURE ─────────────────────────────────────────────────────────────────
 
