@@ -16,7 +16,7 @@ function stripAbsolutePaths(text: string): string {
 
   // Unix absolute paths: /home/user/.../file.ext or /tmp/...
   // Capture the last path segment (the filename)
-  result = result.replace(/\/(?:home|tmp|usr|var|opt|root|private)\/(?:[^\s:()]+\/)*([^\s:()\/]+)/g, '<PATH>/$1');
+  result = result.replace(/(?:home|tmp|usr|var|opt|root|private)(?:[^\s:()]+)*([^\s:()]+)/g, '<PATH>/$1');
 
   return result;
 }

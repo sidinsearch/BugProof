@@ -27,7 +27,7 @@ export function isValidGitRef(ref: string): boolean {
   if (ref.startsWith('-')) return false;
   // Allow hex SHAs or branch-like names
   // Valid chars: a-z, A-Z, 0-9, /, ., _, -
-  return /^[a-zA-Z0-9._\/-]+$/.test(ref);
+  return /^[a-zA-Z0-9._/-]+$/.test(ref);
 }
 
 /**
