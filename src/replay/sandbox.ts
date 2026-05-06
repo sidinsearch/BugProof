@@ -37,6 +37,19 @@ export interface SandboxResult {
 export async function createSandbox(options: SandboxOptions): Promise<SandboxResult> {
   // ── current mode: no isolation ──
   if (options.mode === 'current') {
+    const tempDir = options.targetDir || fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-replay-'));
+    const artifactFilesDir = path.join(options.artifactPath, 'files');
+
+    if (fs.existsSync(artifactFilesDir)) {
+      copyDirRecursive(artifactFilesDir, tempDir);
+      return {
+        workingDirectory: tempDir,
+        tempDir,
+        needsCleanup: true,
+        usedFallback: true,
+      };
+    }
+
     return {
       workingDirectory: options.originalWorkingDir,
       needsCleanup: false,

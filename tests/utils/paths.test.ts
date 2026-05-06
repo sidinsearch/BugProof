@@ -26,5 +26,13 @@ describe('Path Utilities', () => {
       const mapped = mapToReplayEnvironment(originalPath, tempRoot);
       expect(mapped).toBe(path.join(tempRoot, 'home/user/project/src/app.ts'));
     });
+
+    it('should map Windows absolute paths into the replay root', () => {
+      const tempRoot = '/tmp/bugproof-replay-123';
+      const originalPath = 'D:\\BugProof\\dummy-project\\bugs\\java\\J1NullPointer.java';
+
+      const mapped = mapToReplayEnvironment(originalPath, tempRoot);
+      expect(mapped).toBe(path.join(tempRoot, 'BugProof\\dummy-project\\bugs\\java\\J1NullPointer.java'));
+    });
   });
 });

@@ -70,6 +70,14 @@ export async function replayArtifact(
       ...options.envOverrides,
     } as Record<string, string>;
 
+    const hostPath = process.env.PATH || process.env.Path || process.env.path;
+    if (hostPath) {
+      replayEnv.PATH = hostPath;
+      if (process.platform === 'win32') {
+        replayEnv.Path = hostPath;
+      }
+    }
+
     // 3. Re-run the command in the sandbox directory
     const replayConfig: RunConfig = {
       ...runConfig,

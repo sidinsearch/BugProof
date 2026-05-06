@@ -24,16 +24,27 @@ describe('Replay Sandbox', () => {
   });
 
   describe('createSandbox (mode=current)', () => {
-    it('should return cwd as the working directory with no temp dir', async () => {
+    it('should return a temp replay workspace when artifact files are available', async () => {
+      const tmpArtifact = fs.mkdtempSync(path.join(os.tmpdir(), 'bp-current-'));
+      createdDirs.push(tmpArtifact);
+
+      const filesDir = path.join(tmpArtifact, 'files');
+      fs.mkdirSync(filesDir, { recursive: true });
+      fs.writeFileSync(path.join(filesDir, 'hello.txt'), 'hi');
+
       const result = await createSandbox({
         mode: 'current',
         originalWorkingDir: process.cwd(),
-        artifactPath: '',
+        artifactPath: tmpArtifact,
       });
 
-      expect(result.workingDirectory).toBe(process.cwd());
-      expect(result.tempDir).toBeUndefined();
-      expect(result.needsCleanup).toBe(false);
+      if (result.tempDir) createdDirs.push(result.tempDir);
+
+      expect(result.workingDirectory).not.toBe(process.cwd());
+      expect(result.tempDir).toBeDefined();
+      expect(result.needsCleanup).toBe(true);
+      expect(result.usedFallback).toBe(true);
+      expect(fs.existsSync(path.join(result.workingDirectory, 'hello.txt'))).toBe(true);
     });
   });
 
