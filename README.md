@@ -391,6 +391,29 @@ npm run build
 npm test
 ```
 
+## Developer / Engineer Overview
+
+This section helps maintainers and integrators understand the architecture, testing, and shipping process for BugProof.
+
+- Architecture: modular pipeline (Capture → Packager → Replay → Verdict). Key modules:
+  - `src/capture/*` — execution capture and environment snapshot
+  - `src/capture/language-support.ts` — multi-language detection and language-context.json generation
+  - `src/replay/*` — artifact restore, sandboxing, and verdict generation
+  - `src/replay/verdict.ts` — fingerprint and normalized-pattern matching logic
+
+- Testing: unit tests (Jest) live under `tests/`; integration tests under `tests/integration/`.
+  - Run `npm test` for full suite. Use `npm run test:e2e` for cross-platform orchestrator (requires SSH hosts configured).
+
+- Cross-platform QA: use `scripts/e2e-matrix.js` to run Windows↔Linux scenarios. Configure SSH in `scripts/e2e-matrix.js` or provide `E2E_TARGET` env.
+
+- Shipping checklist (short):
+  1. Ensure `npm run build` passes and `npm test` is green locally on both Windows and Linux runners.
+  2. Update `CHANGELOG.md` and bump `package.json` version.
+  3. Tag a release `git tag -a vX.Y.Z -m "Release vX.Y.Z"` and push tags.
+  4. CI will run `prepublishOnly` and publish on tag events.
+
+If you are integrating BugProof into a CI pipeline, prefer running `bugproof inspect` in a hermetic container to validate artifact contents before attempting replay.
+
 ## CI and Releases
 
 - `push` and `pull_request` CI runs only for core paths such as `src/`, `scripts/`, `tests/`, `package.json`, `tsconfig.json`, and `assets/`.

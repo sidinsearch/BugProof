@@ -1,6 +1,6 @@
 {
   "name": "bugproof",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Executable bug artifacts — portable, reproducible bug reports",
   "main": "dist/cli.js",
   "type": "module",
@@ -19,6 +19,7 @@
     "format": "prettier --write 'src/**/*.ts'",
     "cli": "tsx src/cli.ts",
     "test:e2e": "node scripts/e2e-matrix.js",
+    "test:matrix": "node scripts/multi-language-matrix.cjs",
     "test:comprehensive": "node scripts/comprehensive-test.js",
     "release": "node scripts/release.cjs"
   },

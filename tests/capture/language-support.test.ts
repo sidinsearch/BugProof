@@ -141,17 +141,15 @@ describe('Language Support Detection', () => {
     expect(result.criticalFiles).toContain('go.sum');
   });
 
-  it('should detect Rust project', () => {
-    fs.writeFileSync(path.join(tempDir, 'Cargo.toml'), '[package]\nname = "test"');
-    fs.writeFileSync(path.join(tempDir, 'Cargo.lock'), '');
+  it('should detect Ruby project', () => {
+    fs.writeFileSync(path.join(tempDir, 'Gemfile'), "source 'https://rubygems.org'\n");
 
     const result = detectProjectLanguages(tempDir);
 
-    expect(result.languages.some(l => l.id === 'rust')).toBe(true);
-    const rust = result.languages.find(l => l.id === 'rust')!;
-    expect(rust.buildSystem).toBe('cargo');
-    expect(rust.crossPlatform).toBe('medium');
-    expect(result.criticalFiles).toContain('Cargo.toml');
+    expect(result.languages.some(l => l.id === 'ruby')).toBe(true);
+    const ruby = result.languages.find(l => l.id === 'ruby')!;
+    expect(ruby.packageManager).toBe('bundler');
+    expect(result.criticalFiles).toContain('Gemfile');
   });
 
   it('should detect .NET project', () => {
@@ -164,6 +162,29 @@ describe('Language Support Detection', () => {
     expect(dotnet.buildSystem).toBe('dotnet');
     expect(dotnet.crossPlatform).toBe('high');
     expect(result.buildCommands.some(c => c.includes('dotnet build'))).toBe(true);
+  });
+
+  it('should detect Kotlin Gradle project through Java path', () => {
+    fs.writeFileSync(path.join(tempDir, 'build.gradle.kts'), 'plugins { kotlin("jvm") version "1.9.0" }');
+
+    const result = detectProjectLanguages(tempDir);
+
+    const java = result.languages.find(l => l.id === 'java')!;
+    expect(java.buildSystem).toBe('gradle');
+    expect(result.criticalFiles).toContain('build.gradle.kts');
+  });
+
+  it('should detect Rust project', () => {
+    fs.writeFileSync(path.join(tempDir, 'Cargo.toml'), '[package]\nname = "test"');
+    fs.writeFileSync(path.join(tempDir, 'Cargo.lock'), '');
+
+    const result = detectProjectLanguages(tempDir);
+
+    expect(result.languages.some(l => l.id === 'rust')).toBe(true);
+    const rust = result.languages.find(l => l.id === 'rust')!;
+    expect(rust.buildSystem).toBe('cargo');
+    expect(rust.crossPlatform).toBe('medium');
+    expect(result.criticalFiles).toContain('Cargo.toml');
   });
 
   it('should detect multiple languages in a project', () => {

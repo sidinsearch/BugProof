@@ -1,3 +1,13 @@
+## 0.2.2 - 2026-05-08
+
+- Multi-language detection and language-context metadata added (Java, C/C++, Go, Rust, .NET, Ruby).
+- Cross-platform sandbox translation layer: command/path/env mapping to improve Windows↔Linux replays.
+- Improved source strategy and detection for projects without git (stacktrace/minimal modes).
+- Added integration tests and expanded dependency detection across languages.
+- Docs: Developer/engineering overview and cross-platform testing guidance.
+
+---
+
 # Changelog
 
 All notable changes to BugProof will be documented in this file.
