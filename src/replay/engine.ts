@@ -3,6 +3,7 @@ import { FailureRecord } from '../types/failure.js';
 import { executeAndCapture } from '../capture/engine.js';
 import { createBugBox, BugBoxResult } from '../sandbox/bugbox.js';
 import { sanitizeArtifactEnvironment } from '../utils/security.js';
+import { detectCrossPlatform, translateCommand, translateEnvironment } from '../sandbox/cross-platform.js';
 
 export interface ReplayOptions {
   artifactPath: string;
@@ -13,6 +14,8 @@ export interface ReplayOptions {
   /** Git branch from the artifact manifest (used for branch mode) */
   gitBranch?: string;
   sandboxLevel?: 'workspace' | 'isolated' | 'full';
+  /** Platform the artifact was captured on (for cross-platform translation) */
+  capturedPlatform?: string;
 }
 
 export interface ReplayResult {
@@ -30,6 +33,13 @@ export interface ReplayResult {
     appliedLayers: string[];
     skippedLayers: string[];
     platform: string;
+  };
+  /** Cross-platform translation info */
+  crossPlatform?: {
+    needsTranslation: boolean;
+    translations: string[];
+    warnings: string[];
+    blockers: string[];
   };
 }
 
@@ -62,13 +72,35 @@ export async function replayArtifact(
   });
 
   try {
-    // 2. Merge environments — sanitize artifact env to block dangerous overrides
+    // 2. Cross-platform detection and translation
+    const capturedPlatform = options.capturedPlatform || process.platform;
+    const crossPlatform = detectCrossPlatform(capturedPlatform);
+
+    let replayCommand = runConfig.command;
+    const allTranslations: string[] = [];
+    const allBlockers: string[] = [];
+
+    if (crossPlatform.needsTranslation) {
+      const cmdTranslation = translateCommand(replayCommand, capturedPlatform);
+      replayCommand = cmdTranslation.command;
+      allTranslations.push(...cmdTranslation.translations);
+      allBlockers.push(...cmdTranslation.blockers);
+    }
+
+    // 3. Merge environments — sanitize artifact env to block dangerous overrides
     const safeArtifactEnv = sanitizeArtifactEnvironment(runConfig.environment);
-    const replayEnv = {
+    let replayEnv = {
       ...process.env,
       ...safeArtifactEnv,
       ...options.envOverrides,
     } as Record<string, string>;
+
+    // Apply cross-platform environment translation
+    if (crossPlatform.needsTranslation) {
+      const envTranslation = translateEnvironment(replayEnv, capturedPlatform);
+      replayEnv = envTranslation.environment;
+      allTranslations.push(...envTranslation.translations);
+    }
 
     const hostPath = process.env.PATH || process.env.Path || process.env.path;
     if (hostPath) {
@@ -78,10 +110,11 @@ export async function replayArtifact(
       }
     }
 
-    // 3. Re-run the command in the sandbox directory
+    // 4. Re-run the command in the sandbox directory
     const replayConfig: RunConfig = {
       ...runConfig,
       ...bugbox.runConfigOverrides,
+      command: replayCommand,
       environment: replayEnv,
     };
 
@@ -100,6 +133,12 @@ export async function replayArtifact(
         skippedLayers: bugbox.skippedLayers,
         platform: bugbox.capabilities.platform,
       },
+      crossPlatform: crossPlatform.needsTranslation ? {
+        needsTranslation: true,
+        translations: allTranslations,
+        warnings: crossPlatform.warnings,
+        blockers: allBlockers,
+      } : undefined,
     };
   } finally {
     // 4. Always clean up the sandbox

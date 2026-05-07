@@ -8,6 +8,9 @@ import { filterByExcludePatterns } from '../utils/exclude.js';
 import { isPathWithinBoundary } from '../utils/security.js';
 import { ArtifactManifest, EnvSchema, RunConfig, ArtifactMetadata } from '../types/artifact.js';
 import { FailureRecord } from '../types/failure.js';
+import { SourceStrategyResult } from './source-strategy.js';
+import { EnvSnapshot } from './env-snapshot.js';
+import { ProjectLanguageContext } from './language-support.js';
 
 export interface PackageOptions {
   manifest: ArtifactManifest;
@@ -20,6 +23,12 @@ export interface PackageOptions {
   secretKeys: string[];
   includeUntracked?: boolean;
   excludePatterns?: string[];
+  /** Smart source strategy result (if available) */
+  sourceStrategy?: SourceStrategyResult;
+  /** Environment snapshot (runtime versions) */
+  envSnapshot?: EnvSnapshot;
+  /** Detected project languages and build context */
+  languageContext?: ProjectLanguageContext;
 }
 
 export interface FileEntry {
@@ -94,7 +103,40 @@ export async function packageArtifact(
     // 6. Write file manifest with checksums
     fs.writeFileSync(path.join(tempDir, 'files.json'), JSON.stringify(fileEntries, null, 2));
 
-    // 7. Write logs
+    // 7. Write source strategy metadata
+    if (options.sourceStrategy) {
+      fs.writeFileSync(
+        path.join(tempDir, 'source-strategy.json'),
+        JSON.stringify({
+          strategy: options.sourceStrategy.strategy,
+          commit: options.sourceStrategy.commit,
+          reason: options.sourceStrategy.reason,
+        }, null, 2),
+      );
+
+      // Write git patch if available
+      if (options.sourceStrategy.patch) {
+        fs.writeFileSync(path.join(tempDir, 'changes.patch'), options.sourceStrategy.patch);
+      }
+    }
+
+    // 8. Write environment snapshot
+    if (options.envSnapshot) {
+      fs.writeFileSync(
+        path.join(tempDir, 'env-snapshot.json'),
+        JSON.stringify(options.envSnapshot, null, 2),
+      );
+    }
+
+    // 8b. Write language context
+    if (options.languageContext) {
+      fs.writeFileSync(
+        path.join(tempDir, 'language-context.json'),
+        JSON.stringify(options.languageContext, null, 2),
+      );
+    }
+
+    // 9. Write logs
     const logsDir = path.join(tempDir, 'logs');
     fs.mkdirSync(logsDir, { recursive: true });
     fs.writeFileSync(path.join(logsDir, 'stdout.txt'), options.stdout);
@@ -143,7 +185,8 @@ function copySourceFiles(
 
   const result = spawnSync('git', gitArgs, { cwd: workingDir, encoding: 'utf-8' });
   if (result.status !== 0) {
-    throw new Error(`git ls-files failed: ${result.stderr}`);
+    // Not a git repo or git not available — return empty file list
+    return [];
   }
 
   let relativePaths = result.stdout

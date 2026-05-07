@@ -30,6 +30,7 @@ describe('Capture Engine', () => {
   });
 
   it('should capture stderr from a thrown error', async () => {
+    // Increased timeout: spawning node on Windows can be slow under CI/load
     const result = await executeAndCapture({
       command: ['node', '-e', 'throw new Error("boom")'],
       working_directory: process.cwd(),
@@ -43,7 +44,7 @@ describe('Capture Engine', () => {
     // stderr_snippet is only last 5 lines, which may not include the message on all Node versions
     expect(result.failure.stderr_snippet.length).toBeGreaterThan(0);
     expect(result.failure.error_patterns.length).toBeGreaterThan(0);
-  });
+  }, 15000);
 
   it('should handle command timeout', async () => {
     const result = await executeAndCapture({

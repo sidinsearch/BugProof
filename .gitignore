@@ -47,6 +47,7 @@ docs/
 .gstack-worktrees/
 .opencode/
 .vscode/
+.windsurf/
 
 # --------------------------------------------------------------------
 # 4. Auto-generated Product & Agent Docs

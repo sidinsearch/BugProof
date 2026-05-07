@@ -180,6 +180,145 @@ bugproof diff --json bug-before.bug bug-after.bug
 Options:
 - `--json` Structured JSON output
 
+### `bugproof watch [command...]`
+
+Run a command transparently — auto-capture a `.bug` artifact only if it fails. This is the everyday command. Replace `npm test` with `bugproof watch -- npm test` in your workflow.
+
+Examples:
+
+```bash
+bugproof watch -- npm test
+bugproof watch -- python app.py
+bugproof watch -- cargo build
+bugproof watch --always -- node script.js   # capture even on success
+bugproof watch -o ./bugs -- go test ./...   # output to ./bugs/ directory
+```
+
+Options:
+- `--timeout <ms>` Command timeout (default: from `.bugproofrc` or 300000)
+- `-n, --name <name>` Artifact name
+- `-d, --description <desc>` Description
+- `-o, --output <dir>` Output directory
+- `--always` Capture even when command succeeds
+- `--json` Structured JSON output
+
+### `bugproof init`
+
+Create a `.bugproofrc` config file in the current directory.
+
+```bash
+bugproof init
+bugproof init --force  # overwrite existing
+```
+
+Config options (`.bugproofrc`):
+
+```json
+{
+  "exclude": ["node_modules/**", "dist/**", "*.bug"],
+  "outputDir": ".",
+  "timeout": 300000,
+  "skipSecrets": false,
+  "includeUntracked": false,
+  "maxArtifactSizeMB": 50,
+  "nameTemplate": "bug_{timestamp}"
+}
+```
+
+Name template variables: `{timestamp}`, `{command}`, `{exit_code}`
+
+### `bugproof share <artifact>`
+
+Share an artifact via GitHub Gist. Creates a secret gist with manifest, failure info, and a README.
+
+```bash
+bugproof share my-bug.bug
+bugproof share --public my-bug.bug
+```
+
+Requires `GITHUB_TOKEN` or `BUGPROOF_GITHUB_TOKEN` env var with `gist` scope.
+
+Options:
+- `--public` Create a public gist (default: secret/unlisted)
+- `--json` Structured JSON output
+
+## Smart Features
+
+### Dependency Detection
+
+When capturing, BugProof automatically detects missing dependencies from error output:
+
+```
+  Missing Dependencies Detected
+    ➜ express (node)
+      npm install express
+```
+
+Supports: Node.js, Python, Ruby, Go, Rust, system libraries.
+
+### Smart Hints on Replay
+
+When a replay produces a different error than expected, BugProof provides actionable hints:
+
+```
+  Hints
+    ➜ Missing Node.js module
+      Install the missing package: npm install express
+    • Network connectivity issue
+      A network connection failed. Check that the required service/host is running.
+```
+
+## Smart Source Strategy
+
+BugProof intelligently determines how to include source code, keeping artifacts small even for heavy codebases:
+
+| Strategy | Condition | What ships | Artifact size |
+|----------|-----------|------------|---------------|
+| `git-full` | Clean git repo | Commit hash only | ~2 KB |
+| `git-patch` | Dirty git repo | Commit hash + diff patch | ~5 KB |
+| `stacktrace` | No git | Only files from error stacktrace | ~10-50 KB |
+| `minimal` | No git, no stacktrace | Command only | ~1 KB |
+
+**Git is strongly encouraged but not required.** Without git, BugProof extracts file paths from your error stacktrace and ships only those files — not your entire codebase.
+
+```
+  ➜ Source: Git repo dirty at 5b7c1131. Shipping commit ref + diff patch (0.2 KB).
+```
+
+## BugBox Container
+
+BugProof includes its own lightweight container sandbox — Docker-like isolation without Docker:
+
+```bash
+bugproof replay --container my-bug.bug     # replay with full isolation
+bugproof replay --sandbox full my-bug.bug  # alternative: use sandbox layers
+```
+
+### Isolation layers per platform
+
+| Layer | Linux | Windows | macOS |
+|-------|-------|---------|-------|
+| Process isolation | PID namespace (`unshare --pid`) | Job Objects | sandbox-exec |
+| Network isolation | Network namespace (`unshare --net`) | Firewall rules (`netsh`) | sandbox-exec deny |
+| Filesystem | fuse-overlayfs (read-only source + writable overlay) | Isolated temp | Restricted writes |
+| Resource limits | cgroups v2 (memory, CPU, PIDs) | Job Object limits | — |
+| Env sanitization | Strip `LD_PRELOAD`, `NODE_OPTIONS`, etc. | Same | Same |
+| Temp isolation | Private `/tmp` | Private `%TEMP%` | Private `/tmp` |
+
+No Docker daemon, no images, no 400MB overhead. Just native OS primitives.
+
+## Environment Snapshot
+
+BugProof captures runtime versions at capture time and warns on replay when versions differ:
+
+```
+  Environment Mismatches
+    • node version mismatch: captured 18.0.0, current 22.1.0
+    ✘ python 3.11.0 was available at capture but is not installed now.
+```
+
+Tracked runtimes: Node.js, Python, Ruby, Go, Rust, Java, npm, pip, OS platform, architecture.
+
 ## File Association and Icon Registration
 
 ### Windows
@@ -231,11 +370,18 @@ These project principles remain unchanged:
 - [x] v0.1: CLI core (capture/replay/inspect/diff)
 - [x] v0.1: Cross-platform replay support
 - [x] v0.1: Secret redaction and sandbox layers
-- [ ] v0.2: npm global install polish and Docker sandbox fallback
-- [ ] v0.2: Web UI for artifact inspection
-- [ ] v0.3: Artifact push/pull and signing
-- [ ] v0.3: Language-specific dependency detection
+- [x] v0.2: Watch command (auto-capture on failure)
+- [x] v0.2: Project config (`.bugproofrc`)
+- [x] v0.2: Dependency detection (Node/Python/Ruby/Go/Rust)
+- [x] v0.2: Smart hints on replay failure
+- [x] v0.2: Share via GitHub Gist
+- [x] v0.2.1: Smart source strategy (git-full/git-patch/stacktrace/minimal)
+- [x] v0.2.1: BugBox Container (lightweight Docker-like isolation)
+- [x] v0.2.1: Environment snapshot + mismatch warnings
+- [ ] v0.3: Web UI for artifact inspection
+- [ ] v0.3: Artifact signing and verification
 - [ ] v0.4: GitHub issue integration and richer diff visualization
+- [ ] v0.4: CI/CD plugins (GitHub Actions, GitLab CI)
 
 ## Development
 
