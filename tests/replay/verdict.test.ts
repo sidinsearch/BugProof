@@ -27,11 +27,19 @@ describe('Verdict Generator', () => {
     expect(verdict.message).toContain('exact fingerprint match');
   });
 
-  it('should confirm fuzzy pattern match if fingerprint differs', () => {
-    const actualFailure = { ...baseFailure, fingerprint: 'sha256:diff5678' };
+  it('should confirm normalized pattern match when order differs', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      error_patterns: ['TypeError', 'ERR_MODULE_NOT_FOUND'],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:diff5678',
+      error_patterns: ['ERR_MODULE_NOT_FOUND', 'TypeError', 'TypeError', 'something went wrong while parsing'],
+    };
     
     const verdict = generateVerdict({
-      expectedFailure: baseFailure,
+      expectedFailure,
       actualFailure,
       actualStdout: '',
       actualStderr: '',
@@ -39,7 +47,141 @@ describe('Verdict Generator', () => {
     });
     
     expect(verdict.status).toBe('confirmed');
-    expect(verdict.message).toContain('fuzzy match');
+    expect(verdict.message).toContain('normalized pattern match');
+  });
+
+  it('should confirm when the same root cause has an extra incidental pattern token', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      error_patterns: ['TypeError'],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:extra-token',
+      error_patterns: ['TypeError', 'ERR_SOMETHING_ELSE'],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('confirmed');
+    expect(verdict.message).toContain('normalized pattern match');
+  });
+
+  it('should not confirm when an extra exception token is present', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      error_patterns: ['TypeError'],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:code-token',
+      error_patterns: ['TypeError', 'RangeError'],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('not_confirmed');
+    expect(verdict.message).toContain('different error');
+  });
+
+  it('should confirm when only freeform error text matches', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      error_patterns: ['fatal: cannot open file'],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:freeform-match',
+      error_patterns: ['fatal: cannot open file'],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('confirmed');
+    expect(verdict.message).toContain('normalized pattern match');
+  });
+
+  it('should confirm freeform matches regardless of case', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      error_patterns: ['Error Message'],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:case-match',
+      error_patterns: ['error message'],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('confirmed');
+    expect(verdict.message).toContain('normalized pattern match');
+  });
+
+  it('should not confirm when error patterns are empty', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      error_patterns: [],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:empty-patterns',
+      error_patterns: [],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('not_confirmed');
+    expect(verdict.message).toContain('different error');
+  });
+
+  it('should not confirm when an unexpected exception token is present', () => {
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:partial-overlap',
+      error_patterns: ['TypeError', 'RangeError'],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure: baseFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('not_confirmed');
+    expect(verdict.message).toContain('different error');
   });
 
   it('should not confirm if exit code is 0 (success)', () => {
