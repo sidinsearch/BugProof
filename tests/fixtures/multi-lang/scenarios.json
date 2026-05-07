@@ -1,0 +1,47 @@
+[
+  {
+    "fixture": "node-app",
+    "language": "javascript",
+    "message": "node fixture failure"
+  },
+  {
+    "fixture": "python-app",
+    "language": "python",
+    "message": "python fixture failure"
+  },
+  {
+    "fixture": "java-app",
+    "language": "java",
+    "message": "java fixture failure"
+  },
+  {
+    "fixture": "cpp-app",
+    "language": "cpp",
+    "message": "cpp fixture failure"
+  },
+  {
+    "fixture": "go-app",
+    "language": "go",
+    "message": "go fixture failure"
+  },
+  {
+    "fixture": "rust-app",
+    "language": "rust",
+    "message": "rust fixture failure"
+  },
+  {
+    "fixture": "ruby-app",
+    "language": "ruby",
+    "message": "ruby fixture failure"
+  },
+  {
+    "fixture": "dotnet-app",
+    "language": "dotnet",
+    "message": "dotnet fixture failure"
+  },
+  {
+    "fixture": "kotlin-app",
+    "language": "java",
+    "message": "kotlin fixture failure"
+  }
+]
