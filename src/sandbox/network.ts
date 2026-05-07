@@ -151,15 +151,21 @@ export function createNetworkCleanup(
  * @returns true if the rule was added, false on failure.
  */
 export function addFirewallBlockRule(ruleName: string, exePath: string): boolean {
+  const safeRuleName = sanitizeFirewallRuleName(ruleName);
+  const safeExePath = sanitizeExecutablePath(exePath);
+  if (!safeRuleName || !safeExePath) {
+    return false;
+  }
+
   try {
     const result = spawnSync(
       'netsh',
       [
         'advfirewall', 'firewall', 'add', 'rule',
-        `name=${ruleName}`,
+        `name=${safeRuleName}`,
         'dir=out',
         'action=block',
-        `program=${exePath}`,
+        `program=${safeExePath}`,
       ],
       { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' },
     );
@@ -167,4 +173,30 @@ export function addFirewallBlockRule(ruleName: string, exePath: string): boolean
   } catch {
     return false;
   }
+}
+
+function sanitizeFirewallRuleName(value: string): string | null {
+  if (!value || value.length > 120) {
+    return null;
+  }
+  if (/[\r\n\t=]/.test(value)) {
+    return null;
+  }
+  if (!/^[A-Za-z0-9 _.-]+$/.test(value)) {
+    return null;
+  }
+  return value;
+}
+
+function sanitizeExecutablePath(value: string): string | null {
+  if (!value || value.length > 260) {
+    return null;
+  }
+  if (/[\r\n\0]/.test(value)) {
+    return null;
+  }
+  if (/["<>|]/.test(value)) {
+    return null;
+  }
+  return value;
 }

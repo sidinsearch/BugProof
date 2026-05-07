@@ -79,6 +79,6 @@ describe('Config Loader', () => {
       command: 'npm test --coverage',
       exit_code: 2,
     });
-    expect(name).toBe('npm_test_--coverage_2');
+    expect(name).toBe('npm_test___coverage_2');
   });
 });

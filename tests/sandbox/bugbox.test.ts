@@ -165,4 +165,40 @@ describe('Bug-Box Orchestrator', () => {
     expect(result.resourceStrategy).toBe('cgroups');
     expect(result.runConfigOverrides.command).toEqual(['systemd-run', '--', 'unshare', '--pid', '--', 'npm', 'test']);
   });
+
+  it('should generate randomized firewall rule names for netsh pre-exec', async () => {
+    const { createSandbox } = require('../../src/replay/sandbox');
+    const { selectNetworkStrategy, buildNetworkIsolationArgs, createNetworkCleanup, addFirewallBlockRule } = require('../../src/sandbox/network');
+
+    (detectCapabilities as jest.Mock).mockReturnValue({
+      platform: 'win32',
+      hasUnshare: false,
+      hasCgroupsV2: false,
+      hasJobObjects: true,
+      hasNetsh: true,
+      hasSandboxExec: false,
+    });
+
+    createSandbox.mockResolvedValue({ workingDirectory: '/fake/bugbox/workspace', needsCleanup: true });
+    selectNetworkStrategy.mockReturnValue('netsh');
+    buildNetworkIsolationArgs.mockReturnValue({
+      command: ['node', 'script.js'],
+      needsPreExec: true,
+      strategy: 'netsh',
+    });
+    createNetworkCleanup.mockReturnValue(jest.fn());
+    addFirewallBlockRule.mockReturnValue(true);
+
+    await createBugBox({
+      ...baseOpts,
+      level: 'isolated',
+      command: ['node', 'script.js'],
+    });
+
+    expect(addFirewallBlockRule).toHaveBeenCalledTimes(1);
+    const [ruleName, exePath] = addFirewallBlockRule.mock.calls[0];
+    expect(ruleName).toMatch(/^bugbox-net-[a-f0-9]{12}$/);
+    expect(typeof exePath).toBe('string');
+    expect(exePath.toLowerCase()).toContain('node');
+  });
 });

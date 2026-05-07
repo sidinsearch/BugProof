@@ -1,4 +1,5 @@
 import {
+  addFirewallBlockRule,
   buildNetworkIsolationArgs,
   createNetworkCleanup,
   NetworkIsolationResult,
@@ -142,6 +143,18 @@ describe('Bug-Box Network Isolation', () => {
     it('should not throw when called without a ruleName for netsh', () => {
       const cleanup = createNetworkCleanup('netsh');
       expect(() => cleanup()).not.toThrow();
+    });
+  });
+
+  describe('addFirewallBlockRule', () => {
+    it('should reject invalid rule names before spawning netsh', () => {
+      expect(addFirewallBlockRule('bad\nrule', 'C:\\Program Files\\nodejs\\node.exe')).toBe(false);
+      expect(addFirewallBlockRule('bad=rule', 'C:\\Program Files\\nodejs\\node.exe')).toBe(false);
+    });
+
+    it('should reject invalid executable paths before spawning netsh', () => {
+      expect(addFirewallBlockRule('bugbox-net-test', 'C:\\Program Files\\nodejs\\node.exe\nnetsh')).toBe(false);
+      expect(addFirewallBlockRule('bugbox-net-test', 'C:\\Program Files\\nodejs\\"node".exe')).toBe(false);
     });
   });
 });

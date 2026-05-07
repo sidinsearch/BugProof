@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { zipDirectory, extractZip } from '../../src/utils/archive';
+import { zipDirectory, extractZip, validateArchiveEntryPath } from '../../src/utils/archive';
 
 describe('Archive Utilities', () => {
   let tempDir: string;
@@ -45,5 +45,13 @@ describe('Archive Utilities', () => {
 
     const deepTxt = fs.readFileSync(path.join(destDir, 'nested', 'deep.txt'), 'utf-8');
     expect(deepTxt).toBe('deep content');
+  });
+
+  it('should reject archive entries with path traversal', () => {
+    expect(() => validateArchiveEntryPath('../../owned.txt', destDir)).toThrow('Path traversal attempt detected');
+  });
+
+  it('should reject archive entries with absolute paths', () => {
+    expect(() => validateArchiveEntryPath('/tmp/owned.txt', destDir)).toThrow('Invalid archive entry path');
   });
 });

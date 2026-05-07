@@ -18,12 +18,29 @@ import { banner, success, warn, error, info, kvLine, c, icons } from './utils/ui
 import { loadConfig, generateDefaultConfig, applyNameTemplate } from './config/loader.js';
 import { generateHints } from './replay/hints.js';
 import { shareToGist } from './share/gist.js';
+import { sanitizeShareError } from './share/gist.js';
 import { detectMissingDependencies } from './utils/dependencies.js';
 import { determineSourceStrategy } from './capture/source-strategy.js';
 import { captureEnvSnapshot, compareEnvSnapshots, EnvSnapshot } from './capture/env-snapshot.js';
 import { detectProjectLanguages } from './capture/language-support.js';
+import {
+  secureJsonParse,
+  validateArtifactManifest,
+  validateFailureRecord,
+  validateRunConfig,
+} from './utils/artifact-validation.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
+
+function enforceNodeVersion(): void {
+  const major = Number.parseInt(process.versions.node.split('.')[0] || '0', 10);
+  if (Number.isNaN(major) || major < 18) {
+    console.error(`BugProof requires Node.js >= 18.0.0. Current runtime: ${process.version}`);
+    process.exit(1);
+  }
+}
+
+enforceNodeVersion();
 
 const program = new Command();
 
@@ -318,18 +335,21 @@ program
 
       try {
         const manifestRaw = fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8');
-        manifest = JSON.parse(manifestRaw);
-        runConfig = JSON.parse(fs.readFileSync(path.join(targetPath, 'run.json'), 'utf-8'));
-        expectedFailure = JSON.parse(fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8'));
+        const runRaw = fs.readFileSync(path.join(targetPath, 'run.json'), 'utf-8');
+        const failureRaw = fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8');
+
+        manifest = validateArtifactManifest(secureJsonParse(manifestRaw, 'manifest.json'));
+        runConfig = validateRunConfig(secureJsonParse(runRaw, 'run.json'));
+        expectedFailure = validateFailureRecord(secureJsonParse(failureRaw, 'failure.json'));
       } catch (parseErr) {
-      if (jsonMode) {
-        console.log(JSON.stringify({ reproduced: false, error: `Corrupted artifact: ${parseErr}` }));
-      } else {
-        error(`Corrupted artifact — could not parse JSON files in ${artifact}`);
-        info(`Detail: ${parseErr}`);
+        if (jsonMode) {
+          console.log(JSON.stringify({ reproduced: false, error: `Corrupted artifact: ${parseErr}` }));
+        } else {
+          error(`Corrupted artifact — invalid metadata in ${artifact}`);
+          info(`Detail: ${parseErr}`);
+        }
+        process.exit(1);
       }
-      process.exit(1);
-    }
 
     if (!jsonMode) {
       kvLine('Artifact', manifest.name);
@@ -358,7 +378,9 @@ program
             }
             console.log();
           }
-        } catch {}
+        } catch {
+          // Ignore optional snapshot parsing errors and continue replay.
+        }
       }
     }
 
@@ -396,6 +418,10 @@ program
         bugBox: replayResult.bugBox,
       }));
     } else {
+      if ((options.sandbox === 'isolated' || options.sandbox === 'full') && replayResult.bugBox?.platform === 'win32') {
+        warn('Windows sandbox isolation is best-effort. Use a VM for untrusted artifacts.');
+      }
+
       // Show cross-platform warnings/translations before verdict
       if (replayResult.crossPlatform) {
         console.log(c.bold('  Cross-Platform Translation'));
@@ -517,10 +543,11 @@ program
         await extractZip(artifact, tempDir);
       }
 
-      const manifest: ArtifactManifest = JSON.parse(
-        fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8'),
-      );
-      const failure = JSON.parse(fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8'));
+      const manifestRaw = fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8');
+      const failureRaw = fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8');
+
+      const manifest: ArtifactManifest = validateArtifactManifest(secureJsonParse(manifestRaw, 'manifest.json'));
+      const failure = validateFailureRecord(secureJsonParse(failureRaw, 'failure.json'));
 
       // Read file entries
       const filesJsonPath = path.join(targetPath, 'files.json');
@@ -652,8 +679,12 @@ program
       }
 
     const loadSnapshot = (artifactDir: string): ArtifactSnapshot => {
-      const manifest = JSON.parse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf-8'));
-      const failure = JSON.parse(fs.readFileSync(path.join(artifactDir, 'failure.json'), 'utf-8'));
+      const manifest = validateArtifactManifest(
+        secureJsonParse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf-8'), 'manifest.json'),
+      );
+      const failure = validateFailureRecord(
+        secureJsonParse(fs.readFileSync(path.join(artifactDir, 'failure.json'), 'utf-8'), 'failure.json'),
+      );
       const filesJsonPath = path.join(artifactDir, 'files.json');
       const files = fs.existsSync(filesJsonPath) ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8')) : [];
       return { manifest, failure, files };
@@ -954,9 +985,9 @@ program
       }
     } catch (err) {
       if (jsonMode) {
-        console.log(JSON.stringify({ success: false, error: String(err) }));
+        console.log(JSON.stringify({ success: false, error: sanitizeShareError(String(err)) }));
       } else {
-        error(String(err));
+        error(sanitizeShareError(String(err)));
       }
       process.exit(1);
     }

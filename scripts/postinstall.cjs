@@ -17,11 +17,11 @@ function isCommandAvailable(command) {
   return result.status === 0;
 }
 
-function runCommand(command, args, timeout = 5000) {
+function runCommand(command, args, timeout = 5000, captureOutput = false) {
   return spawnSync(command, args, {
     encoding: 'utf8',
     timeout,
-    stdio: 'ignore',
+    stdio: captureOutput ? 'pipe' : 'ignore',
   });
 }
 
@@ -56,6 +56,27 @@ function ensureParentDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
+function isSafeWindowsPath(value) {
+  return typeof value === 'string'
+    && value.length > 0
+    && !/[\r\n\0]/.test(value);
+}
+
+function quoteForWindowsCommand(value) {
+  if (!isSafeWindowsPath(value)) {
+    throw new Error('Unsafe Windows path detected for registry command.');
+  }
+  return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function queryRegistryValue(keyPath) {
+  const result = runCommand('reg', ['query', keyPath, '/ve'], 5000, true);
+  if (result.status !== 0) {
+    return null;
+  }
+  return result.stdout || '';
+}
+
 function registerWindowsAssociation() {
   if (process.platform !== 'win32') {
     return;
@@ -63,7 +84,7 @@ function registerWindowsAssociation() {
 
   const reg = (args) => runCommand('reg', args, 5000);
 
-  const openCommand = `\"${process.execPath}\" \"${cliPath}\" replay \"%1\"`;
+  const openCommand = `${quoteForWindowsCommand(process.execPath)} ${quoteForWindowsCommand(cliPath)} replay \"%1\"`;
 
   const outcomes = [];
 
@@ -77,7 +98,7 @@ function registerWindowsAssociation() {
     '/f',
   ]));
 
-  if (fs.existsSync(iconPath)) {
+  if (fs.existsSync(iconPath) && isSafeWindowsPath(iconPath)) {
     outcomes.push(reg([
       'add',
       'HKCU\\Software\\Classes\\BugProof.Artifact\\DefaultIcon',
@@ -101,6 +122,11 @@ function registerWindowsAssociation() {
   if (failed) {
     log('WARNING: Windows .bug association setup partially failed. Run scripts/bugproof-file-association-windows.reg manually.');
   } else {
+    const commandQuery = queryRegistryValue('HKCU\\Software\\Classes\\BugProof.Artifact\\shell\\open\\command');
+    if (!commandQuery || !commandQuery.includes(openCommand)) {
+      log('WARNING: Windows association write could not be verified. Run scripts/bugproof-file-association-windows.reg manually.');
+      return;
+    }
     log('Windows .bug file association registered (HKCU).');
   }
 }
@@ -212,4 +238,11 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  isSafeWindowsPath,
+  quoteForWindowsCommand,
+};

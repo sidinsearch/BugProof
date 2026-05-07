@@ -1,6 +1,23 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import archiver from 'archiver';
 import extract from 'extract-zip';
+import { isPathWithinBoundary } from './security.js';
+
+const MAX_ARCHIVE_FILES = 10000;
+const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 500 * 1024 * 1024;
+const MAX_SINGLE_FILE_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
+
+export function validateArchiveEntryPath(entryName: string, destDir: string): void {
+  if (!entryName || path.isAbsolute(entryName) || entryName.includes('\0')) {
+    throw new Error(`Invalid archive entry path: ${entryName}`);
+  }
+
+  const normalized = path.resolve(destDir, entryName);
+  if (!isPathWithinBoundary(normalized, destDir)) {
+    throw new Error(`Path traversal attempt detected: ${entryName}`);
+  }
+}
 
 /**
  * Compresses a directory into a ZIP archive.
@@ -36,7 +53,38 @@ export async function zipDirectory(sourceDir: string, outPath: string): Promise<
  */
 export async function extractZip(zipPath: string, destDir: string): Promise<void> {
   try {
-    await extract(zipPath, { dir: destDir });
+    const resolvedDest = path.resolve(destDir);
+    let fileCount = 0;
+    let totalSize = 0;
+
+    await extract(zipPath, {
+      dir: resolvedDest,
+      onEntry: (entry) => {
+        fileCount += 1;
+        if (fileCount > MAX_ARCHIVE_FILES) {
+          throw new Error('Archive contains too many files');
+        }
+
+        const entryName = entry.fileName || '';
+        validateArchiveEntryPath(entryName, resolvedDest);
+
+        const size = typeof entry.uncompressedSize === 'number' ? entry.uncompressedSize : 0;
+        if (size > MAX_SINGLE_FILE_UNCOMPRESSED_BYTES) {
+          throw new Error(`Archive entry too large: ${entryName}`);
+        }
+        totalSize += size;
+        if (totalSize > MAX_ARCHIVE_UNCOMPRESSED_BYTES) {
+          throw new Error('Archive uncompressed size limit exceeded');
+        }
+
+        if (entry.externalFileAttributes !== undefined) {
+          const mode = (entry.externalFileAttributes >> 16) & 0o170000;
+          if (mode === 0o120000) {
+            throw new Error(`Symbolic links are not allowed in archives: ${entryName}`);
+          }
+        }
+      },
+    });
   } catch (err) {
     throw new Error(`Failed to extract artifact: ${err instanceof Error ? err.message : err}`);
   }

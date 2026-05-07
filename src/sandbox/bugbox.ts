@@ -5,6 +5,10 @@
  * and the existing replay sandbox into a single easy-to-use interface.
  */
 
+import { randomBytes } from 'crypto';
+import * as path from 'path';
+import * as fs from 'fs';
+
 import { SandboxResult, SandboxOptions, createSandbox, cleanupSandbox } from '../replay/sandbox.js';
 import { detectCapabilities, PlatformCapabilities } from './capabilities.js';
 import {
@@ -105,7 +109,7 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
   // 4. Network Isolation
   let netStrategy: NetworkStrategy = 'none';
   let netCleanup = () => {};
-  const ruleName = `bugbox-net-${Date.now()}`;
+  const ruleName = `bugbox-net-${randomBytes(6).toString('hex')}`;
 
   if (options.level === 'isolated' || options.level === 'full') {
     netStrategy = selectNetworkStrategy(caps);
@@ -113,18 +117,23 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
     if (netStrategy === 'none') {
       skippedLayers.push('network: primitive not available on this OS');
     } else {
-      appliedLayers.push('network');
       const netResult = buildNetworkIsolationArgs(netStrategy, options.command);
       
       runConfigOverrides.command = netResult.command;
       
       if (netResult.needsPreExec) {
-        const exePath = netResult.command[0];
-        // If this fails, we just continue (best effort isolation)
-        addFirewallBlockRule(ruleName, exePath);
+        const exePath = resolveExecutableForFirewall(netResult.command[0]);
+        if (!exePath || !addFirewallBlockRule(ruleName, exePath)) {
+          skippedLayers.push('network: firewall rule setup failed on Windows');
+          netStrategy = 'none';
+        } else {
+          appliedLayers.push('network');
+          netCleanup = createNetworkCleanup('netsh', ruleName);
+        }
+      } else {
+        appliedLayers.push('network');
+        netCleanup = createNetworkCleanup(netStrategy, ruleName);
       }
-      
-      netCleanup = createNetworkCleanup(netStrategy, ruleName);
     }
   }
 
@@ -181,4 +190,33 @@ export async function createBugBox(options: BugBoxOptions): Promise<BugBoxResult
     runConfigOverrides,
     cleanupFn,
   };
+}
+
+function resolveExecutableForFirewall(command: string): string | null {
+  if (!command) {
+    return null;
+  }
+
+  if (path.isAbsolute(command) && fs.existsSync(command)) {
+    return command;
+  }
+
+  const pathParts = (process.env.PATH || process.env.Path || '').split(path.delimiter).filter(Boolean);
+  const extensions = process.platform === 'win32'
+    ? (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean)
+    : [''];
+
+  for (const baseDir of pathParts) {
+    const candidates = process.platform === 'win32'
+      ? extensions.map((ext) => path.join(baseDir, `${command}${ext.toLowerCase()}`))
+      : [path.join(baseDir, command)];
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
 }

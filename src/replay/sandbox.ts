@@ -37,7 +37,7 @@ export interface SandboxResult {
 export async function createSandbox(options: SandboxOptions): Promise<SandboxResult> {
   // ── current mode: no isolation ──
   if (options.mode === 'current') {
-    const tempDir = options.targetDir || fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-replay-'));
+    const tempDir = options.targetDir || createUniqueTempDir();
     const artifactFilesDir = path.join(options.artifactPath, 'files');
 
     if (fs.existsSync(artifactFilesDir)) {
@@ -65,7 +65,7 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
   }
 
   // ── strict or branch: try git worktree ──
-  const tempDir = options.targetDir || fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-replay-'));
+  const tempDir = options.targetDir || createUniqueTempDir();
 
   // Determine the ref to checkout
   const ref = options.mode === 'strict' ? options.gitCommit : options.gitBranch;
@@ -134,23 +134,23 @@ export function cleanupSandbox(result: SandboxResult): void {
     if (fs.existsSync(gitDir)) {
       const gitContent = fs.readFileSync(gitDir, 'utf-8').trim();
       if (gitContent.startsWith('gitdir:')) {
-        // This is a worktree, find the parent repo and remove the worktree
-        spawnSync('git', ['worktree', 'remove', '--force', result.tempDir], {
-          encoding: 'utf-8',
-          timeout: 10000,
-        });
-        return;
+        const repoRoot = resolveWorktreeRepoRoot(gitContent, result.tempDir);
+        if (repoRoot) {
+          const removeResult = spawnSync('git', ['-C', repoRoot, 'worktree', 'remove', '--force', result.tempDir], {
+            encoding: 'utf-8',
+            timeout: 10000,
+          });
+          if (removeResult.status === 0) {
+            return;
+          }
+        }
       }
     }
   } catch {
     // Fall through to force delete
   }
 
-  try {
-    fs.rmSync(result.tempDir, { recursive: true, force: true });
-  } catch {
-    // Best effort cleanup
-  }
+  removeDirWithRetry(result.tempDir);
 }
 
 // ── Internal helpers ──
@@ -204,6 +204,37 @@ function tryGitCloneAndCheckout(
   );
 
   return { success: checkout.status === 0 };
+}
+
+function createUniqueTempDir(): string {
+  const prefix = `bugproof-replay-${process.pid}-`;
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+function resolveWorktreeRepoRoot(gitFileContent: string, tempDir: string): string | null {
+  const gitdirPath = gitFileContent.slice('gitdir:'.length).trim();
+  if (!gitdirPath) {
+    return null;
+  }
+
+  const resolvedGitDir = path.resolve(tempDir, gitdirPath);
+  const marker = `${path.sep}.git${path.sep}worktrees${path.sep}`;
+  const markerIndex = resolvedGitDir.lastIndexOf(marker);
+  if (markerIndex < 0) {
+    return null;
+  }
+  return resolvedGitDir.slice(0, markerIndex);
+}
+
+function removeDirWithRetry(targetDir: string): void {
+  for (let i = 0; i < 3; i += 1) {
+    try {
+      fs.rmSync(targetDir, { recursive: true, force: true });
+      return;
+    } catch {
+      // Best-effort retries in case of transient locks.
+    }
+  }
 }
 
 function copyDirRecursive(src: string, dest: string): void {

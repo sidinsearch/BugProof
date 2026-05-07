@@ -21,6 +21,14 @@ interface GistFile {
   content: string;
 }
 
+export function sanitizeShareError(input: string): string {
+  return input
+    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer [REDACTED]')
+    .replace(/(gh[pousr]_[A-Za-z0-9_]+)/g, '[REDACTED_TOKEN]')
+    .replace(/("authorization"\s*:\s*")([^"]+)(")/gi, '$1[REDACTED]$3')
+    .replace(/(token\s*[=:]\s*)([^\s,]+)/gi, '$1[REDACTED]');
+}
+
 /**
  * Uploads artifact contents to a GitHub Gist.
  * Requires GITHUB_TOKEN or BUGPROOF_GITHUB_TOKEN env var.
@@ -162,12 +170,14 @@ function httpPost(url: string, data: string, token: string): Promise<string> {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
           resolve(body);
         } else {
-          reject(new Error(`GitHub API error ${res.statusCode}: ${body}`));
+          reject(new Error(sanitizeShareError(`GitHub API error ${res.statusCode}: ${body}`)));
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (err) => {
+      reject(new Error(sanitizeShareError(String(err))));
+    });
     req.write(data);
     req.end();
   });

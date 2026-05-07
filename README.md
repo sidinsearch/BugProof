@@ -305,6 +305,8 @@ bugproof replay --sandbox full my-bug.bug  # alternative: use sandbox layers
 | Env sanitization | Strip `LD_PRELOAD`, `NODE_OPTIONS`, etc. | Same | Same |
 | Temp isolation | Private `/tmp` | Private `%TEMP%` | Private `/tmp` |
 
+Note for Windows: `isolated` and `full` sandbox modes are best-effort hardening, not VM-grade containment. For untrusted artifacts, replay inside a dedicated VM.
+
 No Docker daemon, no images, no 400MB overhead. Just native OS primitives.
 
 ## Environment Snapshot

@@ -149,6 +149,69 @@ describe('CLI end-to-end', () => {
     expect(r.status).toBe(1);
   });
 
+  it('replay should reject artifacts with unknown manifest fields', () => {
+    const badDir = path.join(projectDir, 'bad-artifact');
+    fs.mkdirSync(badDir, { recursive: true });
+
+    fs.writeFileSync(path.join(badDir, 'manifest.json'), JSON.stringify({
+      version: '1.0',
+      bugproof_version: '0.2.2',
+      name: 'bad-artifact',
+      description: 'bad',
+      captured_at: new Date().toISOString(),
+      captured_on: {
+        os: process.platform,
+        arch: process.arch,
+        node_version: process.version,
+      },
+      command: ['node', 'fail.js'],
+      working_directory: projectDir,
+      exit_code: 1,
+      duration_ms: 1,
+      files_count: 0,
+      files_size_bytes: 0,
+      secrets_detected: false,
+      secrets_skipped: [],
+      unknown_field: true,
+    }, null, 2));
+
+    fs.writeFileSync(path.join(badDir, 'run.json'), JSON.stringify({
+      command: ['node', 'fail.js'],
+      working_directory: projectDir,
+      environment: {},
+      timeout_ms: 300000,
+      capture_output: true,
+    }, null, 2));
+
+    fs.writeFileSync(path.join(badDir, 'failure.json'), JSON.stringify({
+      exit_code: 1,
+      signal: null,
+      stdout_lines: 0,
+      stderr_lines: 1,
+      stderr_snippet: 'boom',
+      fingerprint: 'abc',
+      error_patterns: ['TypeError'],
+      duration_ms: 5,
+      timeout: false,
+    }, null, 2));
+
+    const r = run('replay bad-artifact --json', projectDir);
+    expect(r.status).toBe(1);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.reproduced).toBe(false);
+    expect(parsed.error).toContain('unknown field');
+  });
+
+  it('replay should show Windows best-effort sandbox warning in isolated mode', () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+
+    const r = run('replay --sandbox isolated e2e-fail.bug', projectDir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('best-effort');
+  });
+
   // ── diff ──
 
   it('diff should show changes between two artifacts', () => {
