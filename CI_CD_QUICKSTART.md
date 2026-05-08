@@ -139,10 +139,20 @@ npm view bugproof@latest
 
 ## Help
 
-- **Workflow issues?** Check `.github/workflows/release.yml`
+- **Workflow issues?** Check `.github/workflows/ci.yml`
 - **Test failures?** Run `npm test` locally
 - **npm publish errors?** Verify NPM_TOKEN has publish permissions
 - **Questions?** See CI_CD_GUIDE.md
+
+---
+
+## What Changed
+
+The old workflow files (`release.yml`, `release-enhanced.yml`) have been replaced with a single streamlined `ci.yml` that:
+- Eliminates duplicate test runs
+- Fixes race conditions between workflows
+- Provides clearer phase separation
+- Better error handling and logging
 
 ---
 
