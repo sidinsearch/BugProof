@@ -1,6 +1,7 @@
 /**
  * Colored terminal output for BugProof CLI.
  * Uses ANSI codes directly so we avoid ESM-only import issues with chalk v5.
+ * Supports structured logging for CI/CD pipelines.
  */
 
 const isColorSupported = process.stdout.isTTY && !process.env['NO_COLOR'];
