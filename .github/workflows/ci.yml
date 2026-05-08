@@ -47,16 +47,15 @@ env:
 
 jobs:
   # ========================================
-  # Phase 1: Test Matrix (6 combinations)
+  # Phase 1: Test Matrix (3 OS, single Node LTS)
   # ========================================
   test-matrix:
-    name: Test (${{ matrix.os }} / Node ${{ matrix.node }})
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [18, 20]
     
     steps:
       - name: Checkout repository
@@ -64,10 +63,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js ${{ matrix.node }}
+      - name: Setup Node.js 18 LTS
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: '18'
           cache: 'npm'
 
       - name: Install dependencies
@@ -83,7 +82,7 @@ jobs:
         run: npm run lint
 
       - name: Upload coverage to Codecov (Ubuntu only)
-        if: matrix.os == 'ubuntu-latest' && matrix.node == '18'
+        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage/lcov.info
@@ -94,7 +93,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-logs-${{ matrix.os }}-node${{ matrix.node }}
+          name: test-logs-${{ matrix.os }}
           path: |
             coverage/
             logs/
@@ -167,18 +166,36 @@ jobs:
         with:
           name: package-tarball
 
-      - name: Create test environment
-        shell: bash
+      - name: Create test environment (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p smoke-test
           cd smoke-test
           npm init -y
           npm install ../*.tgz
 
-      - name: Verify CLI installation
-        shell: bash
+      - name: Create test environment (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path smoke-test
+          Set-Location smoke-test
+          npm init -y
+          npm install ..\*.tgz
+
+      - name: Verify CLI installation (Unix)
+        if: runner.os != 'Windows'
         run: |
           cd smoke-test
+          npx bugproof --version
+          npx bugproof --help
+          npx bugproof capture --help
+
+      - name: Verify CLI installation (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Set-Location smoke-test
           npx bugproof --version
           npx bugproof --help
           npx bugproof capture --help

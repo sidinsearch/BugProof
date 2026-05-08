@@ -153,6 +153,9 @@ The old workflow files (`release.yml`, `release-enhanced.yml`) have been replace
 - Fixes race conditions between workflows
 - Provides clearer phase separation
 - Better error handling and logging
+- **NEW:** Simplified to single Node.js 18 LTS (stable, widely used)
+- **NEW:** Fixed Windows smoke test failures with proper PowerShell handling
+- **NEW:** Reduced from 6 test combinations to 3 (50% faster CI)
 
 ---
 
