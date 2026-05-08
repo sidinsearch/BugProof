@@ -211,6 +211,9 @@ npm run test:e2e -- --security-focus
 4. **Phase 4: Publication (Week 4)**
    - [ ] All fixes verified
    - [ ] npm publish v0.2.3
+
+  <!-- Workflow test: auto-trigger commit -->
+  Workflow test trigger: 2026-05-08T00:00:00Z
    - [ ] Announce security fixes in CHANGELOG
 
 ---
