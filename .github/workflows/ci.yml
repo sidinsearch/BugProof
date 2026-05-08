@@ -8,8 +8,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
     paths:
       - 'src/**'
       - 'scripts/**'
@@ -277,7 +275,10 @@ jobs:
     name: Auto Version Bump
     runs-on: ubuntu-latest
     needs: smoke-install
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      tag_name: ${{ steps.bump.outputs.tag_name }}
     
     steps:
       - name: Checkout repository
@@ -298,6 +299,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies and bump version
+        id: bump
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -306,29 +308,33 @@ jobs:
           npm ci
           
           echo "Bumping patch version..."
-          npm version patch -m "Release v%s [skip ci]"
+          NEW_VERSION=$(npm version patch -m "Release v%s [skip ci]" | sed 's/^v//')
+          TAG_NAME="v${NEW_VERSION}"
+          
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
           
           echo "Pushing changes and tags..."
           git push origin HEAD:main
           git push origin --tags
           
-          echo "Version bump completed successfully"
+          echo "✅ Version bumped to ${NEW_VERSION}"
 
   # ========================================
-  # Phase 5: Publish (tags only)
+  # Phase 5: Publish to npm & Create Release
   # ========================================
   publish:
     name: Publish to npm & Create Release
     runs-on: ubuntu-latest
-    # When a tag is pushed, it triggers a new workflow run
-    # So we don't need to wait for other jobs
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: auto-version
+    if: needs.auto-version.result == 'success'
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.auto-version.outputs.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -343,8 +349,8 @@ jobs:
       - name: Build package
         run: npm run build
 
-      - name: Get version from tag
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+      - name: Set version from auto-version job
+        run: echo "VERSION=${{ needs.auto-version.outputs.new_version }}" >> $GITHUB_ENV
 
       - name: Validate NPM token
         env:
@@ -418,9 +424,8 @@ jobs:
   post-publish-verify:
     name: Verify Published Package
     runs-on: ubuntu-latest
-    needs: publish
-    # Runs after publish completes in the same workflow run
-    if: startsWith(github.ref, 'refs/tags/v') && always()
+    needs: [auto-version, publish]
+    if: needs.publish.result == 'success'
     
     steps:
       - name: Checkout repository
@@ -431,8 +436,8 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Get version from tag
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+      - name: Set version from auto-version job
+        run: echo "VERSION=${{ needs.auto-version.outputs.new_version }}" >> $GITHUB_ENV
       
       - name: Wait for registry propagation
         run: |
@@ -489,7 +494,7 @@ jobs:
     name: Notify on Failure
     runs-on: ubuntu-latest
     if: failure() && github.event_name == 'push'
-    needs: [test-matrix, security-audit, smoke-install]
+    needs: [test-matrix, security-audit, smoke-install, auto-version, publish, post-publish-verify]
     
     steps:
       - name: Notify failure
