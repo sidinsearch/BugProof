@@ -16,7 +16,6 @@ on:
       - 'package-lock.json'
       - 'tsconfig.json'
       - 'jest.config.js'
-      - 'dummy-project/bugs/**'
       - 'assets/**'
       - '.github/workflows/**'
   pull_request:
@@ -28,22 +27,33 @@ on:
       - 'package-lock.json'
       - 'tsconfig.json'
       - 'jest.config.js'
-      - 'dummy-project/bugs/**'
       - 'assets/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Cut a new release (patch bump → npm publish → GitHub Release). Leave unchecked for a CI-only manual run.'
+        required: false
+        default: false
+        type: boolean
 
-# Prevent concurrent runs on the same branch
+# Prevent concurrent runs on the same branch.
+# Tag/release flow uses a separate group with cancel-in-progress: false to
+# never abort a publish mid-flight (would leave tag pushed but no npm release).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Required permissions for publishing and releases
+# id-token:write enables npm publish --provenance (sigstore signing)
 permissions:
   contents: write
   packages: write
   issues: write
   pull-requests: write
-  actions: read  # Required for workflow status checks
-  checks: write   # Required for status checks
+  actions: read
+  checks: write
+  id-token: write
 
 # Environment variables for all jobs
 env:
@@ -54,63 +64,55 @@ jobs:
   # Phase 1: Test Matrix (3 OS, single Node LTS)
   # ========================================
   test-matrix:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['18', '20']
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Setup Node.js 18 LTS
+      - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ matrix.node }}
           cache: 'npm'
 
-      - name: Install dependencies
+      # npm ci runs `prepare` (build) automatically via package.json
+      - name: Install dependencies (also builds via prepare hook)
         run: npm ci
 
-      - name: Build TypeScript
-        run: npm run build
-
+      # No --passWithNoTests: project has 29 suites / 243 tests; absence is a real failure
       - name: Run tests with coverage
-        run: |
-          echo "Running tests with coverage..."
-          npm test -- --runInBand --verbose --coverage --passWithNoTests
-          echo "Test coverage report generated"
+        run: npm test -- --runInBand --coverage
 
       - name: Run linter
-        run: |
-          echo "Running linter..."
-          npm run lint
-          echo "Linting completed"
+        run: npm run lint
 
-      - name: Upload coverage to Codecov (Ubuntu only)
-        if: matrix.os == 'ubuntu-latest' && always()
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '20' && always()
         uses: codecov/codecov-action@v4
         with:
-          file: ./coverage/lcov.info
+          files: ./coverage/lcov.info
           flags: unittests
-          name: codecov-umbrella
+          name: codecov-${{ matrix.os }}-node${{ matrix.node }}
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
 
       - name: Upload test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-logs-${{ matrix.os }}
-          path: |
-            coverage/
-            logs/
-            ~/.npm/_logs/
+          name: test-logs-${{ matrix.os }}-node${{ matrix.node }}
+          path: coverage/
           retention-days: 7
+          if-no-files-found: ignore
 
   # ========================================
   # Phase 2: Security & Package Validation
@@ -119,27 +121,28 @@ jobs:
     name: Security Audit & Package
     runs-on: ubuntu-latest
     needs: test-matrix
+    timeout-minutes: 10
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run security audit
-        run: npm audit --audit-level=high || echo "Audit completed with warnings"
+      # Hard fail on high/critical vulnerabilities; warnings still surface in logs
+      - name: Run security audit (production deps only)
+        run: npm audit --omit=dev --audit-level=high
 
-      - name: Check for outdated dependencies
-        run: npm outdated || echo "Dependency check completed"
+      - name: Report outdated dependencies (informational)
+        continue-on-error: true
+        run: npm outdated
 
       - name: Create package tarball
         run: npm pack
@@ -150,6 +153,7 @@ jobs:
           name: package-tarball
           path: '*.tgz'
           retention-days: 7
+          if-no-files-found: error
 
   # ========================================
   # Phase 3: Cross-Platform Install Test
@@ -158,6 +162,7 @@ jobs:
     name: Smoke Install (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: security-audit
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -170,56 +175,78 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
+      # Download to a dedicated dir so any committed *.tgz in repo root
+      # cannot collide with the freshly built artifact.
       - name: Download package tarball
         uses: actions/download-artifact@v4
         with:
           name: package-tarball
+          path: artifact
 
       - name: List downloaded files
         shell: bash
-        run: ls -la *.tgz || echo "No tarballs found"
+        run: ls -la artifact/*.tgz
 
       - name: Create test environment (Unix)
         if: runner.os != 'Windows'
+        shell: bash
         run: |
+          set -e
           mkdir -p smoke-test
           cd smoke-test
-          npm init -y
-          # Get the actual tarball name
-          TARBALL=$(ls ../*.tgz | head -1)
+          npm init -y >/dev/null
+          # Pick the freshly built tarball (only one in artifact/)
+          TARBALLS=( ../artifact/*.tgz )
+          if [ ${#TARBALLS[@]} -ne 1 ]; then
+            echo "::error::Expected exactly 1 tarball in artifact/, found ${#TARBALLS[@]}"
+            ls -la ../artifact/ || true
+            exit 1
+          fi
+          TARBALL="${TARBALLS[0]}"
           echo "Installing tarball: $TARBALL"
           npm install "$TARBALL"
-          # List installed files to debug
-          ls -la node_modules/.bin/ | grep bugproof || echo "Bugproof binary not found in .bin"
 
       - name: Create test environment (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path smoke-test
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path smoke-test | Out-Null
           Set-Location smoke-test
-          npm init -y
-          # Get the actual tarball name
-          $Tarball = Get-ChildItem ..\*.tgz | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          npm init -y | Out-Null
+          $Tarballs = @(Get-ChildItem ..\artifact\*.tgz)
+          if ($Tarballs.Count -ne 1) {
+            Write-Host "::error::Expected exactly 1 tarball in artifact/, found $($Tarballs.Count)"
+            Get-ChildItem ..\artifact\
+            exit 1
+          }
+          $Tarball = $Tarballs[0].FullName
           Write-Host "Installing tarball: $Tarball"
           npm install $Tarball
-          # List installed files to debug
-          Get-ChildItem node_modules\.bin\ | Where-Object { $_.Name -like "*bugproof*" }
 
       - name: Verify CLI installation (Unix)
         if: runner.os != 'Windows'
+        shell: bash
         run: |
+          set -e
           cd smoke-test
-          # Try multiple approaches to run the CLI
-          echo "Trying npx bugproof..."
-          npx bugproof --version || echo "npx failed"
-          echo "Trying direct binary..."
-          ./node_modules/.bin/bugproof --version || echo "Direct binary failed"
-          echo "Trying node with dist/cli.js..."
-          node node_modules/bugproof/dist/cli.js --version || echo "Node with dist/cli.js failed"
+          # At least one launch method must succeed; otherwise fail the job.
+          if npx bugproof --version; then
+            echo "✅ npx bugproof works"
+          elif ./node_modules/.bin/bugproof --version; then
+            echo "✅ direct binary works"
+          elif node node_modules/bugproof/dist/cli.js --version; then
+            echo "✅ node dist/cli.js works"
+          else
+            echo "::error::All CLI launch methods failed on ${{ runner.os }}"
+            echo "Inspecting installed package:"
+            ls -la node_modules/.bin/ || true
+            cat node_modules/bugproof/package.json 2>/dev/null | grep -A2 '"bin"' || true
+            exit 1
+          fi
 
       - name: Verify CLI installation (Windows)
         if: runner.os == 'Windows'
@@ -269,13 +296,22 @@ jobs:
           exit 1
 
   # ========================================
-  # Phase 4: Auto Version Bump (main branch only)
+  # Phase 4: Auto Version Bump (main branch)
   # ========================================
+  # Auto-publishes on every push to main (excluding [skip ci] commits).
+  # Manual workflow_dispatch with `release: true` also triggers a release.
   auto-version:
     name: Auto Version Bump
     runs-on: ubuntu-latest
     needs: smoke-install
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
+    timeout-minutes: 5
+    if: |
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.release == true)
+      )
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
       tag_name: ${{ steps.bump.outputs.tag_name }}
@@ -295,7 +331,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies and bump version
@@ -306,19 +342,23 @@ jobs:
           set -e
           echo "Installing dependencies..."
           npm ci
-          
+
           echo "Bumping patch version..."
-          NEW_VERSION=$(npm version patch -m "Release v%s [skip ci]" | sed 's/^v//')
+          # Default behavior creates a commit AND an annotated tag locally
+          npm version patch -m "Release v%s [skip ci]" >/dev/null
+          # Read the canonical version from package.json (robust, no parsing)
+          NEW_VERSION=$(node -p "require('./package.json').version")
           TAG_NAME="v${NEW_VERSION}"
-          
+
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
-          
-          echo "Pushing changes and tags..."
-          git push origin HEAD:main
-          git push origin --tags
-          
-          echo "✅ Version bumped to ${NEW_VERSION}"
+
+          # Atomic push: commit + tag together. If either fails, neither lands,
+          # avoiding a commit-without-tag state that would break the publish job.
+          echo "Pushing commit + tag atomically..."
+          git push --atomic origin "HEAD:main" "refs/tags/${TAG_NAME}"
+
+          echo "✅ Version bumped to ${NEW_VERSION}, tag ${TAG_NAME} pushed"
 
   # ========================================
   # Phase 5: Publish to npm & Create Release
@@ -327,6 +367,7 @@ jobs:
     name: Publish to npm & Create Release
     runs-on: ubuntu-latest
     needs: auto-version
+    timeout-minutes: 10
     if: needs.auto-version.result == 'success'
     
     steps:
@@ -339,18 +380,27 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
+      # npm ci runs `prepare` (build) automatically
+      - name: Install dependencies (also builds via prepare hook)
         run: npm ci
 
-      - name: Build package
-        run: npm run build
-
+      # Indirect through env: instead of direct ${{ }} interpolation in shell
+      # to defend against script injection if outputs ever contain metacharacters.
       - name: Set version from auto-version job
-        run: echo "VERSION=${{ needs.auto-version.outputs.new_version }}" >> $GITHUB_ENV
+        env:
+          NEW_VERSION: ${{ needs.auto-version.outputs.new_version }}
+        run: |
+          set -e
+          # Defense-in-depth: validate SemVer shape before exporting
+          if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "::error::Invalid SemVer from auto-version: $NEW_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
 
       - name: Validate NPM token
         env:
@@ -362,59 +412,92 @@ jobs:
             exit 1
           fi
       
-      - name: Publish to npm
+      - name: Publish to npmjs.org (with provenance)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -e
-          echo "Publishing to npm..."
-          npm publish --access public
-          echo "✅ Published to npmjs.com"
-          
-          # Create deployment status
-          echo "::notice::Package published successfully to npm"
+          echo "Publishing bugproof@${VERSION} to npmjs.org with provenance..."
+          npm publish --access public --provenance
+          echo "::notice::Published bugproof@${VERSION} to npmjs.org with sigstore provenance"
 
-      - name: Verify package on npm
+      # ----- GitHub Packages mirror -----
+      # GitHub Packages requires scoped package names. We rewrite package.json
+      # in-memory to publish under @sidinsearch/bugproof, then revert.
+      # GITHUB_TOKEN is auto-provisioned per run (no secret setup needed).
+      - name: Publish mirror to GitHub Packages (@sidinsearch/bugproof)
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        if: env.NODE_AUTH_TOKEN != ''
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_OWNER: ${{ github.repository_owner }}
         run: |
-          echo "Waiting for npm registry propagation..."
-          sleep 10
-          npm view bugproof@${{ env.VERSION }} || echo "Package still propagating"
+          set -e
+          echo "Preparing scoped package for GitHub Packages..."
+          # Backup original package.json
+          cp package.json package.json.bak
 
+          # Rewrite name to scoped variant (lowercase owner per npm rules)
+          OWNER_LC=$(echo "$GH_OWNER" | tr '[:upper:]' '[:lower:]')
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.name = '@${OWNER_LC}/bugproof';
+            pkg.publishConfig = { registry: 'https://npm.pkg.github.com' };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          # Auth file scoped to GitHub Packages registry
+          {
+            echo "@${OWNER_LC}:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
+          } > .npmrc
+
+          echo "Publishing @${OWNER_LC}/bugproof@${VERSION} to GitHub Packages..."
+          npm publish --access public
+
+          # Restore original state so subsequent steps see the canonical package
+          mv package.json.bak package.json
+          rm -f .npmrc
+          echo "::notice::Published @${OWNER_LC}/bugproof@${VERSION} to GitHub Packages"
+
+      # Static intro is appended above the auto-generated changelog so we keep
+      # both: install instructions + per-PR changelog from generate_release_notes.
       - name: Create GitHub Release
         if: success()
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Release v${{ env.VERSION }}
+          tag_name: ${{ needs.auto-version.outputs.tag_name }}
+          append_body: true
+          generate_release_notes: true
           body: |
             ## 📦 BugProof v${{ env.VERSION }}
-            
-            ### Installation
+
+            ### Install from npmjs.org (recommended)
             ```bash
-            # Global install
-            npm install -g bugproof
-            
-            # Local install
-            npm install bugproof
+            npm install -g bugproof@${{ env.VERSION }}
             ```
-            
-            ### What's Changed
-            - See [CHANGELOG.md](https://github.com/sidinsearch/BugProof/blob/main/CHANGELOG.md) for details
-            
+
+            ### Install from GitHub Packages
+            ```bash
+            npm install -g @${{ github.repository_owner }}/bugproof@${{ env.VERSION }} \
+              --registry=https://npm.pkg.github.com
+            ```
+
             ### Verification
-            - ✅ All tests passed on Ubuntu, Windows, and macOS
-            - ✅ Security audit completed
-            - ✅ Cross-platform installation verified
-            
+            - ✅ Tested on Ubuntu, Windows, macOS (Node 18 + 20)
+            - ✅ Security audit (npm audit --audit-level=high)
+            - ✅ Published to npmjs.org with sigstore provenance
+            - ✅ Mirrored to GitHub Packages
+
             ### 🚀 Quick Start
             ```bash
             bugproof capture --skip-secrets -n my-artifact -- echo "Hello World"
             ```
+
+            ---
+
           draft: false
           prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -425,6 +508,7 @@ jobs:
     name: Verify Published Package
     runs-on: ubuntu-latest
     needs: [auto-version, publish]
+    timeout-minutes: 10
     if: needs.publish.result == 'success'
     
     steps:
@@ -434,10 +518,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Set version from auto-version job
-        run: echo "VERSION=${{ needs.auto-version.outputs.new_version }}" >> $GITHUB_ENV
+        env:
+          NEW_VERSION: ${{ needs.auto-version.outputs.new_version }}
+        run: |
+          set -e
+          if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "::error::Invalid SemVer from auto-version: $NEW_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
       
       - name: Wait for registry propagation
         run: |
@@ -455,25 +547,43 @@ jobs:
           done
 
       - name: Install published package globally
-        run: |
-          npm install -g bugproof || echo "Global install failed - package still propagating"
+        run: npm install -g bugproof@${{ env.VERSION }}
 
-      - name: Verify installation
+      - name: Verify installed version matches
+        shell: bash
+        env:
+          EXPECTED: ${{ needs.auto-version.outputs.new_version }}
         run: |
-          bugproof --version || echo "Version check failed"
-          bugproof --help || echo "Help check failed"
+          set -e
+          # Capture stdout AND stderr (some CLIs print --version to stderr)
+          RAW=$(bugproof --version 2>&1)
+          # Extract the first SemVer-shaped string from the CLI output
+          INSTALLED=$(echo "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$INSTALLED" ]; then
+            echo "::error::Could not parse version from output: $RAW"
+            exit 1
+          fi
+          if [ "$INSTALLED" != "$EXPECTED" ]; then
+            echo "::error::Version mismatch: installed=$INSTALLED expected=$EXPECTED"
+            exit 1
+          fi
+          echo "✅ Installed bugproof v$INSTALLED matches expected v$EXPECTED"
+          bugproof --help
 
-      - name: Test basic functionality
+      - name: Test basic functionality (capture)
+        shell: bash
         run: |
+          set -e
           mkdir -p test-verify
           cd test-verify
-          git init
+          git init -q
           git config user.email "test@example.com"
           git config user.name "Test User"
           echo "test" > test.txt
           git add .
-          git commit -m "initial commit"
-          bugproof capture --skip-secrets -n test-artifact -- echo "Test execution" || echo "Capture test failed"
+          git commit -q -m "initial commit"
+          bugproof capture --skip-secrets -n test-artifact -- echo "Test execution"
+          echo "✅ Capture command succeeded"
 
       - name: Report success
         if: success()
@@ -493,11 +603,28 @@ jobs:
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    if: failure() && github.event_name == 'push'
     needs: [test-matrix, security-audit, smoke-install, auto-version, publish, post-publish-verify]
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      (
+        needs.test-matrix.result == 'failure' ||
+        needs.security-audit.result == 'failure' ||
+        needs.smoke-install.result == 'failure' ||
+        needs.auto-version.result == 'failure' ||
+        needs.publish.result == 'failure' ||
+        needs.post-publish-verify.result == 'failure'
+      )
     
     steps:
-      - name: Notify failure
+      - name: Report which jobs failed
         run: |
           echo "::error::CI/CD Pipeline failed on main branch"
-          echo "Please check the workflow logs for details"
+          echo "Job results:"
+          echo "  test-matrix:         ${{ needs.test-matrix.result }}"
+          echo "  security-audit:      ${{ needs.security-audit.result }}"
+          echo "  smoke-install:       ${{ needs.smoke-install.result }}"
+          echo "  auto-version:        ${{ needs.auto-version.result }}"
+          echo "  publish:             ${{ needs.publish.result }}"
+          echo "  post-publish-verify: ${{ needs.post-publish-verify.result }}"
