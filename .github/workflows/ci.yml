@@ -44,20 +44,23 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# Required permissions for publishing and releases
-# id-token:write enables npm publish --provenance (sigstore signing)
+# Least-privilege permissions — only what each job actually exercises:
+#   contents:write   → tag push (auto-version), GitHub Release creation
+#   packages:write   → GitHub Packages mirror publish
+#   id-token:write   → sigstore provenance (when repo is public)
+#   actions:read     → workflow_dispatch input access
 permissions:
   contents: write
   packages: write
-  issues: write
-  pull-requests: write
-  actions: read
-  checks: write
   id-token: write
+  actions: read
 
 # Environment variables for all jobs
 env:
   NODE_OPTIONS: --max-old-space-size=2048
+  # Opt into Node 24 runtime for JavaScript actions ahead of GitHub's June 2026
+  # forced cutover. Removes deprecation warnings from checkout/setup-node/etc.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ========================================
@@ -86,9 +89,11 @@ jobs:
       - name: Install dependencies (also builds via prepare hook)
         run: npm ci
 
-      # No --passWithNoTests: project has 29 suites / 243 tests; absence is a real failure
+      # Call jest directly: `npm test` would re-run `npm run build` redundantly
+      # (build is already done by npm ci's prepare hook above).
+      # No --passWithNoTests: 29 suites / 243 tests; absence is a real failure.
       - name: Run tests with coverage
-        run: npm test -- --runInBand --coverage
+        run: npx jest --runInBand --coverage
 
       - name: Run linter
         run: npm run lint
@@ -411,20 +416,34 @@ jobs:
             exit 1
           fi
       
-      - name: Publish to npmjs.org (with provenance)
+      # --ignore-scripts skips prepublishOnly (which redundantly re-runs the
+      # full test+lint+build that already passed in earlier jobs). Build artifacts
+      # are already on disk from `npm ci`'s prepare hook above.
+      #
+      # --provenance requires a PUBLIC repository (sigstore policy). For private
+      # repos npm rejects the publish with HTTP 422. We auto-detect visibility
+      # and only attach provenance when the repo is public.
+      - name: Publish to npmjs.org
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          IS_PUBLIC: ${{ github.event.repository.visibility == 'public' }}
         run: |
           set -e
-          echo "Publishing bugproof@${VERSION} to npmjs.org with provenance..."
-          npm publish --access public --provenance
-          echo "::notice::Published bugproof@${VERSION} to npmjs.org with sigstore provenance"
+          if [ "$IS_PUBLIC" = "true" ]; then
+            echo "Publishing bugproof@${VERSION} to npmjs.org WITH provenance..."
+            npm publish --access public --provenance --ignore-scripts
+            echo "::notice::Published bugproof@${VERSION} to npmjs.org with sigstore provenance"
+          else
+            echo "Repo is private — publishing without provenance (sigstore requires public repos)"
+            npm publish --access public --ignore-scripts
+            echo "::notice::Published bugproof@${VERSION} to npmjs.org (no provenance: private repo)"
+          fi
 
       # ----- GitHub Packages mirror -----
       # GitHub Packages requires scoped package names. We rewrite package.json
       # in-memory to publish under @sidinsearch/bugproof, then revert.
       # GITHUB_TOKEN is auto-provisioned per run (no secret setup needed).
-      - name: Publish mirror to GitHub Packages (@sidinsearch/bugproof)
+      - name: Publish mirror to GitHub Packages (scoped to @<repo-owner>)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_OWNER: ${{ github.repository_owner }}
@@ -451,7 +470,7 @@ jobs:
           } > .npmrc
 
           echo "Publishing @${OWNER_LC}/bugproof@${VERSION} to GitHub Packages..."
-          npm publish --access public
+          npm publish --access public --ignore-scripts
 
           # Restore original state so subsequent steps see the canonical package
           mv package.json.bak package.json
@@ -485,7 +504,7 @@ jobs:
             ### Verification
             - ✅ Tested on Ubuntu, Windows, macOS (Node 20 LTS)
             - ✅ Security audit (npm audit --audit-level=high)
-            - ✅ Published to npmjs.org with sigstore provenance
+            - ✅ Published to npmjs.org
             - ✅ Mirrored to GitHub Packages
 
             ### 🚀 Quick Start
@@ -530,23 +549,26 @@ jobs:
           fi
           echo "VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
       
+      # $VERSION shell variable comes from $GITHUB_ENV (set by prior validated step).
+      # Avoids ${{ }} interpolation directly into shell command lines.
       - name: Wait for registry propagation
         run: |
+          set -e
           for i in {1..6}; do
-            echo "Attempt $i: Checking if package is available..."
-            if npm view bugproof@${{ env.VERSION }} >/dev/null 2>&1; then
+            echo "Attempt $i: Checking if bugproof@${VERSION} is available..."
+            if npm view "bugproof@${VERSION}" >/dev/null 2>&1; then
               echo "Package is available on npm"
               break
             fi
             if [ $i -eq 6 ]; then
-              echo "Package still not available after 6 attempts"
+              echo "::error::Package bugproof@${VERSION} still not available after 60s"
               exit 1
             fi
             sleep 10
           done
 
       - name: Install published package globally
-        run: npm install -g bugproof@${{ env.VERSION }}
+        run: npm install -g "bugproof@${VERSION}"
 
       - name: Verify installed version matches
         shell: bash
@@ -603,10 +625,12 @@ jobs:
     name: Notify on Failure
     runs-on: ubuntu-latest
     needs: [test-matrix, security-audit, smoke-install, auto-version, publish, post-publish-verify]
+    # Notify on any release-flow failure (auto push OR manual workflow_dispatch).
+    # PR runs are excluded since the PR check itself surfaces failure.
     if: |
       always() &&
-      github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       (
         needs.test-matrix.result == 'failure' ||
         needs.security-audit.result == 'failure' ||
