@@ -214,16 +214,47 @@ jobs:
         shell: powershell
         run: |
           Set-Location smoke-test
+          # List all files in node_modules/.bin to debug
+          Write-Host "Files in node_modules\.bin:"
+          Get-ChildItem node_modules\.bin\ | Format-Table Name
+          
           # Try multiple approaches to run the CLI
           Write-Host "Trying npx bugproof..."
           npx bugproof --version
-          if ($LASTEXITCODE -ne 0) { Write-Host "npx failed" }
-          Write-Host "Trying bugproof.cmd..."
-          .\node_modules\.bin\bugproof.cmd --version
-          if ($LASTEXITCODE -ne 0) { Write-Host "bugproof.cmd failed" }
+          if ($LASTEXITCODE -eq 0) { 
+            Write-Host "npx succeeded!"
+            exit 0 
+          }
+          Write-Host "npx failed"
+          
+          Write-Host "Looking for bugproof files..."
+          $bugproofFiles = Get-ChildItem node_modules\.bin\ | Where-Object { $_.Name -like "*bugproof*" }
+          if ($bugproofFiles) {
+            foreach ($file in $bugproofFiles) {
+              Write-Host "Trying $($file.FullName)..."
+              & $file.FullName --version
+              if ($LASTEXITCODE -eq 0) { 
+                Write-Host "$($file.Name) succeeded!"
+                exit 0 
+              }
+            }
+          }
+          
           Write-Host "Trying node with dist/cli.js..."
           node node_modules\bugproof\dist\cli.js --version
-          if ($LASTEXITCODE -ne 0) { Write-Host "Node with dist/cli.js failed" }
+          if ($LASTEXITCODE -eq 0) { 
+            Write-Host "node with dist/cli.js succeeded!"
+            exit 0 
+          }
+          
+          Write-Host "All methods failed - checking if package was installed..."
+          if (Test-Path node_modules\bugproof\package.json) {
+            Write-Host "Package installed but CLI not working"
+            Get-Content node_modules\bugproof\package.json | Select-String "bin"
+          } else {
+            Write-Host "Package not installed properly"
+          }
+          exit 1
 
   # ========================================
   # Phase 4: Auto Version Bump (main branch only)

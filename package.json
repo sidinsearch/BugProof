@@ -8,6 +8,7 @@
     "bugproof": "dist/cli.js"
   },
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc",
     "postinstall": "node scripts/postinstall.cjs",
     "prepublishOnly": "npm run build && npm run test && npm run lint",
@@ -59,6 +60,7 @@
   },
   "files": [
     "dist",
+    "bin",
     "assets",
     "scripts/bugproof-file-association-*.sh",
     "scripts/bugproof-file-association-*.reg",
