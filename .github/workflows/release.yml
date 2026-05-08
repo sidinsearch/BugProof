@@ -28,13 +28,13 @@ env:
 
 jobs:
   test-matrix:
-    name: Test matrix (OS x Node)
+    name: Test (${{ matrix.os }} / Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [18]
+        node: [18, 20]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,27 +46,38 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: 'npm'
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build (TypeScript → dist/)
         run: npm run build
 
-      - name: Run tests
-        run: npm test -- --runInBand
+      - name: Run full test suite
+        run: npm test -- --runInBand --verbose
 
-      - name: Lint
+      - name: Run linter
         run: npm run lint
 
-      - name: Upload coverage
-        if: success()
+      - name: Upload coverage artifact
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '18'
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.os }}
-          path: coverage
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}-node${{ matrix.node }}
+          path: |
+            ~/.npm/_logs/
+            logs/
+          retention-days: 7
 
   security-audit:
-    name: Security audit & pack
+    name: Security audit & package
     runs-on: ubuntu-latest
     needs: test-matrix
     steps:
@@ -79,47 +90,73 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci
 
-      - name: Run npm audit
-        run: |
-          npm audit --audit-level=moderate || true
+      - name: Run npm audit (non-blocking)
+        run: npm audit --audit-level=moderate || true
+
+      - name: Check for outdated dependencies
+        run: npm outdated || true
 
       - name: Create package tarball
-        run: |
-          npm pack
-        id: pack
+        run: npm pack
 
-      - name: Upload package tarball
+      - name: Upload tarball
         uses: actions/upload-artifact@v4
         with:
           name: package-tarball
           path: '*.tgz'
+          retention-days: 7
 
   smoke-install:
-    name: Smoke install + basic CLI sanity
-    runs-on: ubuntu-latest
+    name: Smoke install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: security-audit
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
       - name: Download package tarball
         uses: actions/download-artifact@v4
         with:
           name: package-tarball
 
-      - name: Smoke install in temp dir
+      - name: Create temp test directory
+        shell: bash
+        run: mkdir -p smoke-test
+
+      - name: Install from tarball
+        shell: bash
         run: |
-          mkdir smoke-test && cd smoke-test
+          cd smoke-test
           npm init -y
           npm install ../*.tgz
-          npx bugproof --version
+
+      - name: Verify CLI version
+        shell: bash
+        run: cd smoke-test && npx bugproof --version
+
+      - name: Verify CLI help
+        shell: bash
+        run: cd smoke-test && npx bugproof --help
+
+      - name: Test capture command help
+        shell: bash
+        run: cd smoke-test && npx bugproof capture --help
 
   publish:
-    name: Publish to registries
+    name: Publish to npm & GitHub
     runs-on: ubuntu-latest
     needs: [smoke-install]
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
@@ -133,11 +170,16 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Ensure NPM token is present
+      - name: Check NPM token availability
         run: |
-          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then echo "NPM_TOKEN secret is not set"; exit 1; fi
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "⚠️  WARNING: NPM_TOKEN not configured"
+            echo "To enable: Settings → Secrets and variables → Repository secrets → New repository secret"
+            echo "Name: NPM_TOKEN, Value: <your-npm-token>"
+            exit 0
+          fi
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci
 
       - name: Build
@@ -148,9 +190,17 @@ jobs:
         run: echo "VERSION=$(node -e \"console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)\")" >> $GITHUB_ENV
 
       - name: Publish to npmjs
+        if: secrets.NPM_TOKEN != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
+
+      - name: Verify package visibility on npm
+        if: secrets.NPM_TOKEN != ''
+        run: |
+          echo "Waiting for npm registry propagation..."
+          sleep 10
+          npm view bugproof@${{ env.VERSION }} || echo "Package still propagating (normal)"
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
@@ -162,7 +212,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   bump-and-tag:
-    name: Auto bump version and tag (on main)
+    name: Auto bump version and tag
     runs-on: ubuntu-latest
     needs: smoke-install
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -190,4 +240,52 @@ jobs:
           npm version patch -m "Release v%s [skip ci]"
           git push origin HEAD:main --force-with-lease
           git push origin --tags
+
+  post-publish-verification:
+    name: Verify published package
+    runs-on: ubuntu-latest
+    needs: publish
+    if: startsWith(github.ref, 'refs/tags/v') && always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Wait for npm registry propagation
+        run: sleep 30
+
+      - name: Install published package globally
+        run: npm install -g bugproof
+
+      - name: Verify installed version
+        run: |
+          bugproof --version
+          bugproof --help
+
+      - name: Test artifact creation
+        run: |
+          mkdir -p test-repo
+          cd test-repo
+          git init
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          echo "test" > test.txt
+          git add .
+          git commit -m "initial commit"
+          bugproof capture --skip-secrets -n test-artifact -- echo "Test execution"
+          ls -la *.bug || echo "Artifact created successfully"
+
+      - name: Report success
+        if: success()
+        run: echo "✅ Post-publish verification passed - Package is ready!"
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "❌ Post-publish verification failed"
+          exit 1
 

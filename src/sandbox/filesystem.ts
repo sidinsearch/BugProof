@@ -57,18 +57,22 @@ export function createIsolatedDir(): IsolatedDirResult {
  * so the replayed process cannot modify captured files.
  *
  * Linux/macOS: removes write bit (chmod a-w recursively).
- * Windows: icacls to deny write.
+ * Windows: attrib +r recursively (more reliable than icacls).
  */
 export function lockDirReadOnly(dirPath: string): void {
   if (!fs.existsSync(dirPath)) return;
 
   if (os.platform() === 'win32') {
-    // On Windows, use icacls to set read-only attribute on all files
-    spawnSync('icacls', [dirPath, '/deny', `${os.userInfo().username}:(W)`, '/T', '/C'], {
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: 'pipe',
-    });
+    // On Windows, use attrib +r to set read-only recursively (simpler and more reliable)
+    try {
+      spawnSync('attrib', ['+r', dirPath, '/s', '/d'], {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: 'pipe',
+      });
+    } catch {
+      // Best effort — attrib may fail on some Windows setups
+    }
   } else {
     // Unix: remove write bit recursively
     setPermissionsRecursive(dirPath, 0o555, 0o444);
@@ -83,12 +87,16 @@ export function unlockDir(dirPath: string): void {
   if (!fs.existsSync(dirPath)) return;
 
   if (os.platform() === 'win32') {
-    // Remove the deny rule
-    spawnSync('icacls', [dirPath, '/remove:d', os.userInfo().username, '/T', '/C'], {
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: 'pipe',
-    });
+    // On Windows, use attrib -r to clear read-only recursively
+    try {
+      spawnSync('attrib', ['-r', dirPath, '/s', '/d'], {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: 'pipe',
+      });
+    } catch {
+      // Best effort — attrib may fail on some Windows setups
+    }
   } else {
     // Unix: restore write bit
     setPermissionsRecursive(dirPath, 0o755, 0o644);
@@ -98,7 +106,7 @@ export function unlockDir(dirPath: string): void {
 /**
  * Removes the entire isolated directory.
  * Handles read-only files by unlocking first.
- * Never throws — best-effort cleanup.
+ * Never throws — best-effort cleanup with retries on Windows.
  */
 export function cleanupIsolatedDir(result: IsolatedDirResult): void {
   if (!fs.existsSync(result.rootDir)) return;
@@ -110,10 +118,26 @@ export function cleanupIsolatedDir(result: IsolatedDirResult): void {
     // Best effort
   }
 
-  try {
-    fs.rmSync(result.rootDir, { recursive: true, force: true });
-  } catch {
-    // Best effort — on Windows, locked handles may prevent immediate removal
+  // On Windows, retry cleanup a few times to handle file locks and handle delays
+  const maxRetries = os.platform() === 'win32' ? 3 : 1;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      fs.rmSync(result.rootDir, { recursive: true, force: true });
+      return; // Success
+    } catch (err) {
+      if (attempt === maxRetries - 1) {
+        // Last attempt failed, but don't throw — best effort
+        break;
+      }
+      // Wait a bit before retrying on Windows to allow file handles to release
+      if (os.platform() === 'win32') {
+        try {
+          spawnSync('timeout', ['/t', '1', '/nobreak'], { stdio: 'pipe' });
+        } catch {
+          // Fallback: continue to next retry anyway
+        }
+      }
+    }
   }
 }
 

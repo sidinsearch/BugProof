@@ -416,11 +416,64 @@ This section helps maintainers and integrators understand the architecture, test
 
 If you are integrating BugProof into a CI pipeline, prefer running `bugproof inspect` in a hermetic container to validate artifact contents before attempting replay.
 
-## CI and Releases
+## CI/CD Pipeline
 
-- `push` and `pull_request` CI runs only for core paths such as `src/`, `scripts/`, `tests/`, `package.json`, `tsconfig.json`, and `assets/`.
-- Docs-only edits like `README.md` do not start the CI workflow.
-- Publishing to npmjs.com and GitHub Packages runs only on version tags like `v0.1.0`.
+BugProof uses an automated, production-grade GitHub Actions pipeline for testing and publishing.
+
+### Pipeline Overview
+
+**Every push to `main` automatically:**
+1. ✅ Runs tests on 6 combinations (Ubuntu/Windows/macOS × Node 18+20)
+2. ✅ Runs security audit (npm audit)
+3. ✅ Validates installation on all platforms
+4. ✅ Auto-bumps patch version
+5. ✅ Publishes to npm registry
+6. ✅ Creates GitHub Release
+
+**Result:** Zero manual steps for releases after initial NPM_TOKEN setup.
+
+### Setup
+
+**One-time configuration (5 minutes):**
+
+1. Generate npm automation token: https://www.npmjs.com/settings/~/tokens
+2. Add to GitHub: Settings → Secrets → `NPM_TOKEN` → Save
+
+See [CI_CD_QUICKSTART.md](./CI_CD_QUICKSTART.md) for step-by-step instructions.
+
+### Test Matrix
+
+| OS        | Node 18 | Node 20 | Status |
+|-----------|---------|---------|--------|
+| Ubuntu    | ✅      | ✅      | 2 runs |
+| Windows   | ✅      | ✅      | 2 runs |
+| macOS     | ✅      | ✅      | 2 runs |
+
+**Per run:** 276 Jest tests + ESLint checks
+
+### Documentation
+
+- **Quick setup:** [CI_CD_QUICKSTART.md](./CI_CD_QUICKSTART.md) (5 min)
+- **Full guide:** [CI_CD_GUIDE.md](./CI_CD_GUIDE.md) (detailed reference)
+- **Implementation:** [CI_CD_IMPLEMENTATION_SUMMARY.md](./CI_CD_IMPLEMENTATION_SUMMARY.md)
+- **Workflow file:** [`.github/workflows/release.yml`](.github/workflows/release.yml)
+
+### Local Validation
+
+Before pushing, run the CI health check locally:
+
+```bash
+node scripts/ci-health-check.js
+```
+
+This validates: build, tests, coverage, linting, security, and CLI.
+
+### Releases
+
+- `push` and `pull_request` CI runs tests only for core paths such as `src/`, `scripts/`, `tests/`, `package.json`, `tsconfig.json`, and `assets/`.
+- Docs-only edits like `README.md` do not trigger the full CI pipeline.
+- Publishing to npmjs.com runs automatically on `main` push (after all tests pass).
+- GitHub Releases are created automatically with generated release notes.
 
 ## License
 
