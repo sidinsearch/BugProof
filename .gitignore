@@ -43,6 +43,7 @@ docs/
 .gbrain/
 .gemini/
 .github/
+!.github/workflows/
 .gstack/
 .gstack-worktrees/
 .opencode/
