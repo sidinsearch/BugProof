@@ -7,6 +7,21 @@ import { determineSourceStrategy } from '../../src/capture/source-strategy.js';
 describe('Source Strategy', () => {
   let tempDir: string;
 
+  function runGit(args: string[]): void {
+    const result = spawnSync('git', args, { cwd: tempDir, encoding: 'utf-8' });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+    }
+  }
+
+  function initGitRepoWithCommit(): void {
+    runGit(['init']);
+    runGit(['config', 'user.name', 'BugProof Test']);
+    runGit(['config', 'user.email', 'bugproof-test@example.com']);
+    runGit(['add', '.']);
+    runGit(['commit', '-m', 'init']);
+  }
+
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-srcstrat-'));
   });
@@ -78,10 +93,12 @@ describe('Source Strategy', () => {
   });
 
   it('should use git-files strategy in a git repo with forced include', () => {
-    spawnSync('git', ['init'], { cwd: tempDir });
+    runGit(['init']);
+    runGit(['config', 'user.name', 'BugProof Test']);
+    runGit(['config', 'user.email', 'bugproof-test@example.com']);
     fs.writeFileSync(path.join(tempDir, 'file.txt'), 'hello');
-    spawnSync('git', ['add', '.'], { cwd: tempDir });
-    spawnSync('git', ['commit', '-m', 'init'], { cwd: tempDir });
+    runGit(['add', '.']);
+    runGit(['commit', '-m', 'init']);
 
     const result = determineSourceStrategy({
       workingDir: tempDir,
@@ -93,10 +110,8 @@ describe('Source Strategy', () => {
   });
 
   it('should use git-full strategy for clean git repo', () => {
-    spawnSync('git', ['init'], { cwd: tempDir });
     fs.writeFileSync(path.join(tempDir, 'file.txt'), 'hello');
-    spawnSync('git', ['add', '.'], { cwd: tempDir });
-    spawnSync('git', ['commit', '-m', 'init'], { cwd: tempDir });
+    initGitRepoWithCommit();
 
     const result = determineSourceStrategy({
       workingDir: tempDir,
@@ -109,10 +124,8 @@ describe('Source Strategy', () => {
   });
 
   it('should use git-patch strategy for dirty git repo', () => {
-    spawnSync('git', ['init'], { cwd: tempDir });
     fs.writeFileSync(path.join(tempDir, 'file.txt'), 'hello');
-    spawnSync('git', ['add', '.'], { cwd: tempDir });
-    spawnSync('git', ['commit', '-m', 'init'], { cwd: tempDir });
+    initGitRepoWithCommit();
     // Make dirty
     fs.writeFileSync(path.join(tempDir, 'file.txt'), 'hello world');
 

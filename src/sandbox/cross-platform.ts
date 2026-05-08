@@ -249,8 +249,8 @@ const COMMAND_MAP: Record<string, Record<string, string>> = {
   'sh': { win32: 'bash' },
 };
 
-/** Binary extensions that cannot run cross-platform */
-const NATIVE_BINARY_EXTENSIONS = ['.exe', '.dll', '.so', '.dylib', '.elf', ''];
+/** Binary extensions that cannot run cross-platform (reserved for future use) */
+const _NATIVE_BINARY_EXTENSIONS = ['.exe', '.dll', '.so', '.dylib', '.elf', ''];
 
 function translateExecutable(
   exe: string,

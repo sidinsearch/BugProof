@@ -49,7 +49,27 @@ describe('CLI end-to-end', () => {
       path.join(projectDir, 'pass.js'),
       'console.log("ok");\n',
     );
-    execSync('git init && git add . && git commit -m "init"', {
+    execSync('git init', {
+      cwd: projectDir,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+    execSync('git config user.name "BugProof Test"', {
+      cwd: projectDir,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+    execSync('git config user.email "bugproof-test@example.com"', {
+      cwd: projectDir,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+    execSync('git add .', {
+      cwd: projectDir,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+    execSync('git commit -m "init"', {
       cwd: projectDir,
       encoding: 'utf-8',
       stdio: 'pipe',

@@ -114,6 +114,7 @@ export async function shareToGist(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function generateGistReadme(manifest: any): string {
   return `# BugProof Artifact: ${manifest.name}
 

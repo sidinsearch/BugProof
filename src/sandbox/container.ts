@@ -35,7 +35,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { spawnSync, SpawnSyncReturns } from 'child_process';
+import { spawnSync } from 'child_process';
 import { detectCapabilities, PlatformCapabilities } from './capabilities.js';
 
 export interface ContainerConfig {
@@ -98,7 +98,9 @@ export function createContainer(config: ContainerConfig): ContainerResult {
   // 1. Create isolated temp directory
   const containerTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bugbox-container-'));
   cleanupFns.push(() => {
-    try { fs.rmSync(containerTmp, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(containerTmp, { recursive: true, force: true }); } catch {
+      // Ignore cleanup errors (e.g., permissions or race conditions)
+    }
   });
 
   // Override temp vars to point to our isolated temp
@@ -150,7 +152,9 @@ export function createContainer(config: ContainerConfig): ContainerResult {
     layers,
     cleanup: () => {
       for (const fn of cleanupFns.reverse()) {
-        try { fn(); } catch {}
+        try { fn(); } catch {
+          // Ignore cleanup errors (e.g., already cleaned up or permissions)
+        }
       }
     },
     description,
@@ -222,7 +226,7 @@ function applyLinuxIsolation(
   command: string[],
   caps: PlatformCapabilities,
   config: ContainerConfig,
-  containerTmp: string,
+  _containerTmp: string,
 ): { command: string[]; layers: ContainerLayer[]; cleanupFns: (() => void)[] } {
   const layers: ContainerLayer[] = [];
   const cleanupFns: (() => void)[] = [];
@@ -280,7 +284,7 @@ function applyWindowsIsolation(
   command: string[],
   caps: PlatformCapabilities,
   config: ContainerConfig,
-  containerTmp: string,
+  _containerTmp: string,
 ): { command: string[]; layers: ContainerLayer[]; cleanupFns: (() => void)[] } {
   const layers: ContainerLayer[] = [];
   const cleanupFns: (() => void)[] = [];
@@ -430,7 +434,9 @@ function copyDirShallow(src: string, dest: string, maxDepth = 3, currentDepth = 
         if (stat.size <= 1 * 1024 * 1024) {
           fs.copyFileSync(srcPath, destPath);
         }
-      } catch {}
+      } catch {
+        // Ignore copy errors for large files or permission issues
+      }
     }
   }
 }
