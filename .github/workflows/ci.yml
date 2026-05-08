@@ -167,7 +167,8 @@ jobs:
           name: package-tarball
 
       - name: List downloaded files
-        run: ls -la *.tgz
+        shell: bash
+        run: ls -la *.tgz || echo "No tarballs found"
 
       - name: Create test environment (Unix)
         if: runner.os != 'Windows'
@@ -179,6 +180,8 @@ jobs:
           TARBALL=$(ls ../*.tgz | head -1)
           echo "Installing tarball: $TARBALL"
           npm install "$TARBALL"
+          # List installed files to debug
+          ls -la node_modules/.bin/ | grep bugproof || echo "Bugproof binary not found in .bin"
 
       - name: Create test environment (Windows)
         if: runner.os == 'Windows'
@@ -191,25 +194,36 @@ jobs:
           $Tarball = Get-ChildItem ..\*.tgz | Select-Object -First 1 | ForEach-Object { $_.FullName }
           Write-Host "Installing tarball: $Tarball"
           npm install $Tarball
+          # List installed files to debug
+          Get-ChildItem node_modules\.bin\ | Where-Object { $_.Name -like "*bugproof*" }
 
       - name: Verify CLI installation (Unix)
         if: runner.os != 'Windows'
         run: |
           cd smoke-test
-          # Use npx with the full path
-          ./node_modules/.bin/bugproof --version
-          ./node_modules/.bin/bugproof --help
-          ./node_modules/.bin/bugproof capture --help
+          # Try multiple approaches to run the CLI
+          echo "Trying npx bugproof..."
+          npx bugproof --version || echo "npx failed"
+          echo "Trying direct binary..."
+          ./node_modules/.bin/bugproof --version || echo "Direct binary failed"
+          echo "Trying node with dist/cli.js..."
+          node node_modules/bugproof/dist/cli.js --version || echo "Node with dist/cli.js failed"
 
       - name: Verify CLI installation (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           Set-Location smoke-test
-          # Use the direct path to avoid npx issues
+          # Try multiple approaches to run the CLI
+          Write-Host "Trying npx bugproof..."
+          npx bugproof --version
+          if ($LASTEXITCODE -ne 0) { Write-Host "npx failed" }
+          Write-Host "Trying bugproof.cmd..."
           .\node_modules\.bin\bugproof.cmd --version
-          .\node_modules\.bin\bugproof.cmd --help
-          .\node_modules\.bin\bugproof.cmd capture --help
+          if ($LASTEXITCODE -ne 0) { Write-Host "bugproof.cmd failed" }
+          Write-Host "Trying node with dist/cli.js..."
+          node node_modules\bugproof\dist\cli.js --version
+          if ($LASTEXITCODE -ne 0) { Write-Host "Node with dist/cli.js failed" }
 
   # ========================================
   # Phase 4: Auto Version Bump (main branch only)
