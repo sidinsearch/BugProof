@@ -166,13 +166,19 @@ jobs:
         with:
           name: package-tarball
 
+      - name: List downloaded files
+        run: ls -la *.tgz
+
       - name: Create test environment (Unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p smoke-test
           cd smoke-test
           npm init -y
-          npm install ../*.tgz
+          # Get the actual tarball name
+          TARBALL=$(ls ../*.tgz | head -1)
+          echo "Installing tarball: $TARBALL"
+          npm install "$TARBALL"
 
       - name: Create test environment (Windows)
         if: runner.os == 'Windows'
@@ -181,24 +187,29 @@ jobs:
           New-Item -ItemType Directory -Force -Path smoke-test
           Set-Location smoke-test
           npm init -y
-          npm install ..\*.tgz
+          # Get the actual tarball name
+          $Tarball = Get-ChildItem ..\*.tgz | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          Write-Host "Installing tarball: $Tarball"
+          npm install $Tarball
 
       - name: Verify CLI installation (Unix)
         if: runner.os != 'Windows'
         run: |
           cd smoke-test
-          npx bugproof --version
-          npx bugproof --help
-          npx bugproof capture --help
+          # Use npx with the full path
+          ./node_modules/.bin/bugproof --version
+          ./node_modules/.bin/bugproof --help
+          ./node_modules/.bin/bugproof capture --help
 
       - name: Verify CLI installation (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
           Set-Location smoke-test
-          npx bugproof --version
-          npx bugproof --help
-          npx bugproof capture --help
+          # Use the direct path to avoid npx issues
+          .\node_modules\.bin\bugproof.cmd --version
+          .\node_modules\.bin\bugproof.cmd --help
+          .\node_modules\.bin\bugproof.cmd capture --help
 
   # ========================================
   # Phase 4: Auto Version Bump (main branch only)
