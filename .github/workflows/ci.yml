@@ -190,7 +190,7 @@ jobs:
       # Download to a dedicated dir so any committed *.tgz in repo root
       # cannot collide with the freshly built artifact.
       - name: Download package tarball
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: package-tarball
           path: artifact

@@ -117,7 +117,7 @@ Examples:
 bugproof capture -- npm test
 bugproof capture -n auth-crash -d "Login fails on expired session" -- node server.js
 bugproof capture --include-untracked -- python app.py
-bugproof capture -e "*.log" -e "*.tmp" -- go test ./...
+bugproof capture -x "*.log" -x "*.tmp" -- go test ./...
 bugproof capture --timeout 600000 -- java -cp . Main
 bugproof capture --json -- node script.js
 ```
@@ -128,7 +128,7 @@ Options:
 - `--timeout <ms>` Command timeout in milliseconds (default: `300000`)
 - `-n, --name <name>` Human-readable artifact name
 - `-d, --description <desc>` Bug description
-- `-e, --exclude <pattern>` Exclude files matching pattern (repeatable)
+- `-x, --exclude <pattern>` Exclude files matching pattern (repeatable)
 - `--json` Structured JSON output
 
 ### `bugproof replay <artifact>`
@@ -359,31 +359,12 @@ Notes:
 - Exit codes may differ by OS for signals/crashes.
 - Fingerprint/error-pattern matching is used for reproduction verdict.
 
-## Legacy Notes (Kept from Old README)
+## Design Principles
 
-These project principles remain unchanged:
-- Security-first default behavior
-- Language-agnostic command capture
-- Minimal runtime dependencies
-- Reproducibility over screenshots/log snippets
-
-## Roadmap
-
-- [x] v0.1: CLI core (capture/replay/inspect/diff)
-- [x] v0.1: Cross-platform replay support
-- [x] v0.1: Secret redaction and sandbox layers
-- [x] v0.2: Watch command (auto-capture on failure)
-- [x] v0.2: Project config (`.bugproofrc`)
-- [x] v0.2: Dependency detection (Node/Python/Ruby/Go/Rust)
-- [x] v0.2: Smart hints on replay failure
-- [x] v0.2: Share via GitHub Gist
-- [x] v0.2.1: Smart source strategy (git-full/git-patch/stacktrace/minimal)
-- [x] v0.2.1: BugBox Container (lightweight Docker-like isolation)
-- [x] v0.2.1: Environment snapshot + mismatch warnings
-- [ ] v0.3: Web UI for artifact inspection
-- [ ] v0.3: Artifact signing and verification
-- [ ] v0.4: GitHub issue integration and richer diff visualization
-- [ ] v0.4: CI/CD plugins (GitHub Actions, GitLab CI)
+- Security-first default behavior (secrets redacted by default)
+- Language-agnostic command capture (works with any CLI tool)
+- Minimal runtime dependencies (Node.js + Git only)
+- Reproducibility over screenshots or log snippets
 
 ## Development
 
@@ -393,87 +374,27 @@ npm run build
 npm test
 ```
 
-## Developer / Engineer Overview
+## Architecture
 
-This section helps maintainers and integrators understand the architecture, testing, and shipping process for BugProof.
+BugProof follows a modular pipeline: **Capture → Package → Replay → Verdict**.
 
-- Architecture: modular pipeline (Capture → Packager → Replay → Verdict). Key modules:
-  - `src/capture/*` — execution capture and environment snapshot
-  - `src/capture/language-support.ts` — multi-language detection and language-context.json generation
-  - `src/replay/*` — artifact restore, sandboxing, and verdict generation
-  - `src/replay/verdict.ts` — fingerprint and normalized-pattern matching logic
+| Module | Purpose |
+|--------|---------|
+| `src/capture/` | Execution capture, environment snapshot, source strategy |
+| `src/replay/` | Artifact restore, sandboxing, verdict generation |
+| `src/replay/verdict.ts` | Fingerprint and normalized-pattern matching |
+| `src/capture/language-support.ts` | Multi-language detection |
 
-- Testing: unit tests (Jest) live under `tests/`; integration tests under `tests/integration/`.
-  - Run `npm test` for full suite. Use `npm run test:e2e` for cross-platform orchestrator (requires SSH hosts configured).
+Tests use Jest and live under `tests/`. Run `npm test` for the full suite. Cross-platform QA uses `scripts/e2e-matrix.js` with SSH-configured Linux hosts.
 
-- Cross-platform QA: use `scripts/e2e-matrix.js` to run Windows↔Linux scenarios. Configure SSH in `scripts/e2e-matrix.js` or provide `E2E_TARGET` env.
+## CI/CD
 
-- Shipping checklist (short):
-  1. Ensure `npm run build` passes and `npm test` is green locally on both Windows and Linux runners.
-  2. Update `CHANGELOG.md` and bump `package.json` version.
-  3. Tag a release `git tag -a vX.Y.Z -m "Release vX.Y.Z"` and push tags.
-  4. CI will run `prepublishOnly` and publish on tag events.
+Every push to `main` triggers automated testing across Ubuntu, Windows, and macOS via GitHub Actions. On success, the pipeline auto-bumps the version, publishes to npm, and creates a GitHub Release. The workflow file is at `.github/workflows/ci.yml`.
 
-If you are integrating BugProof into a CI pipeline, prefer running `bugproof inspect` in a hermetic container to validate artifact contents before attempting replay.
+### One-time setup
 
-## CI/CD Pipeline
-
-BugProof uses an automated, production-grade GitHub Actions pipeline for testing and publishing.
-
-### Pipeline Overview
-
-**Every push to `main` automatically:**
-1. ✅ Runs tests on 6 combinations (Ubuntu/Windows/macOS × Node 18+20)
-2. ✅ Runs security audit (npm audit)
-3. ✅ Validates installation on all platforms
-4. ✅ Auto-bumps patch version
-5. ✅ Publishes to npm registry
-6. ✅ Creates GitHub Release
-
-**Result:** Zero manual steps for releases after initial NPM_TOKEN setup.
-
-### Setup
-
-**One-time configuration (5 minutes):**
-
-1. Generate npm automation token: https://www.npmjs.com/settings/~/tokens
-2. Add to GitHub: Settings → Secrets → `NPM_TOKEN` → Save
-
-See [CI_CD_QUICKSTART.md](./CI_CD_QUICKSTART.md) for step-by-step instructions.
-
-### Test Matrix
-
-| OS        | Node 18 | Node 20 | Status |
-|-----------|---------|---------|--------|
-| Ubuntu    | ✅      | ✅      | 2 runs |
-| Windows   | ✅      | ✅      | 2 runs |
-| macOS     | ✅      | ✅      | 2 runs |
-
-**Per run:** 276 Jest tests + ESLint checks
-
-### Documentation
-
-- **Quick setup:** [CI_CD_QUICKSTART.md](./CI_CD_QUICKSTART.md) (5 min)
-- **Full guide:** [CI_CD_GUIDE.md](./CI_CD_GUIDE.md) (detailed reference)
-- **Implementation:** [CI_CD_IMPLEMENTATION_SUMMARY.md](./CI_CD_IMPLEMENTATION_SUMMARY.md)
-- **Workflow file:** [`.github/workflows/release.yml`](.github/workflows/release.yml)
-
-### Local Validation
-
-Before pushing, run the CI health check locally:
-
-```bash
-node scripts/ci-health-check.js
-```
-
-This validates: build, tests, coverage, linting, security, and CLI.
-
-### Releases
-
-- `push` and `pull_request` CI runs tests only for core paths such as `src/`, `scripts/`, `tests/`, `package.json`, `tsconfig.json`, and `assets/`.
-- Docs-only edits like `README.md` do not trigger the full CI pipeline.
-- Publishing to npmjs.com runs automatically on `main` push (after all tests pass).
-- GitHub Releases are created automatically with generated release notes.
+1. Generate an npm automation token at https://www.npmjs.com/settings/~/tokens
+2. Add it as `NPM_TOKEN` in GitHub: Settings → Secrets and variables → Actions
 
 ## License
 
