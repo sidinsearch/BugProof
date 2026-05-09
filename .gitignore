@@ -56,6 +56,7 @@ docs/
 # --------------------------------------------------------------------
 AGENTS.md
 ARCHITECTURE.md
+CHANGELOG.md
 CHECKPOINT.md
 CLAUDE.md
 CONTRIBUTING.md
@@ -67,6 +68,33 @@ Linux_Env.md
 SETUP_COMPLETE.md
 SETUP_DASHBOARD.md
 STRUCTURE.md
+
+# --------------------------------------------------------------------
+# 4b. CI/CD & Release Documentation (auto-generated)
+# --------------------------------------------------------------------
+CI_CD_CROSS_PLATFORM_TESTING_GUIDE.md
+CI_CD_GUIDE.md
+CI_CD_IMPLEMENTATION_SUMMARY.md
+CI_CD_QUICKSTART.md
+CI_CD_SETUP_SUMMARY.js
+DUAL_REGISTRY_SETUP.md
+FINAL_STATUS_REPORT_2026_05_08.md
+GETTING_STARTED.md
+NPM_PUBLISH.md
+NPM_RELEASE_SETUP.md
+PRODUCTION_READINESS.md
+REGISTRY_SETUP.md
+RELEASE_ASSESSMENT.md
+RELEASE_COMPLETION.md
+RELEASE_READINESS_2026_05_08.md
+RELEASE_STATUS.md
+SECURE_TOKEN_SETUP.md
+SECURITY_AUDIT.md
+SECURITY_AUDIT_SUMMARY.md
+SECURITY_FIXES_CHECKLIST.md
+SHIP-READINESS.md
+TEST_FIXES.md
+TROUBLESHOOTING.md
 
 # --------------------------------------------------------------------
 # 5. Environment & Secrets
