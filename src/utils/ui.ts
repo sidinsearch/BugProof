@@ -36,10 +36,6 @@ function line(len: number): string {
   return icons.divider.repeat(len);
 }
 
-function dividerLine(): void {
-  console.log(c.dim('  ' + line(50)));
-}
-
 export function banner(text: string): void {
   const pad = 4;
   const innerLen = text.length + pad * 2;

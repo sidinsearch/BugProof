@@ -58,15 +58,10 @@ permissions:
 # Environment variables for all jobs
 env:
   NODE_OPTIONS: --max-old-space-size=2048
-  # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: official GitHub-recommended opt-in
-  # (per the deprecation warning text itself). Required because some @v5 actions
-  # still declare Node 20 internally:
-  #   - actions/upload-artifact@v5   (latest; v6 not released)
-  #   - actions/download-artifact@v5 (latest; v6 not released)
-  #   - actions/github-script (SHA-pinned inside codecov-action@v5's bundle)
-  # With this flag set, those actions run on Node 24 with informational notices
-  # instead of "may-not-work" deprecation warnings.
-  # On June 2, 2026, GitHub flips this default ON globally and all notices disappear.
+  # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: safety net — all actions below have been
+  # upgraded to @v6 (Node 24 native) so this flag is technically redundant, but
+  # kept for any transitive sub-action (e.g. inside codecov-action@v6) that
+  # might still declare Node 20. GitHub flips this default ON June 2, 2026.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -84,10 +79,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js 24 LTS
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
@@ -107,7 +102,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage/lcov.info
           flags: unittests
@@ -118,7 +113,7 @@ jobs:
 
       - name: Upload test artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: test-logs-${{ matrix.os }}
           path: coverage/
@@ -136,10 +131,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
@@ -162,7 +157,7 @@ jobs:
         run: npm pack
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: package-tarball
           path: '*.tgz'
@@ -184,10 +179,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
@@ -195,7 +190,7 @@ jobs:
       # Download to a dedicated dir so any committed *.tgz in repo root
       # cannot collide with the freshly built artifact.
       - name: Download package tarball
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: package-tarball
           path: artifact
@@ -348,7 +343,7 @@ jobs:
           echo "✅ NPM_TOKEN is present"
 
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -367,7 +362,7 @@ jobs:
           git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
@@ -417,13 +412,13 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.auto-version.outputs.tag_name }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
@@ -583,10 +578,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 

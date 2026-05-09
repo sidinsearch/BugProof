@@ -14,7 +14,7 @@ import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.
 import { FailureRecord } from './types/failure.js';
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
-import { banner, section, success, warn, error, info, kvLine, c, icons, statusBadge } from './utils/ui.js';
+import { banner, section, success, warn, error, info, kvLine, c, icons } from './utils/ui.js';
 import { loadConfig, generateDefaultConfig, applyNameTemplate } from './config/loader.js';
 import { generateHints } from './replay/hints.js';
 import { shareToGist } from './share/gist.js';
