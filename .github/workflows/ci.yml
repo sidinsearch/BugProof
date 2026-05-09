@@ -79,10 +79,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20 LTS
+      - name: Setup Node.js 24 LTS
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       # npm ci runs `prepare` (build) automatically via package.json
@@ -100,7 +100,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && always()
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage/lcov.info
           flags: unittests
@@ -134,7 +134,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -182,7 +182,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       # Download to a dedicated dir so any committed *.tgz in repo root
@@ -324,21 +324,45 @@ jobs:
       tag_name: ${{ steps.bump.outputs.tag_name }}
     
     steps:
+      # FAIL-FAST: validate NPM_TOKEN before mutating any git state.
+      # If we discover a missing token AFTER pushing the version-bump commit
+      # and tag, recovery requires manual tag deletion + force-pushing main.
+      # Catching it here means the release simply doesn't start.
+      - name: Pre-flight check (NPM_TOKEN must exist before mutating git)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::NPM_TOKEN secret is missing or empty"
+            echo "::error::Configure it at: Settings → Secrets and variables → Actions → New repository secret"
+            echo "::error::Aborting BEFORE creating any tag/commit to avoid orphan release state"
+            exit 1
+          fi
+          echo "✅ NPM_TOKEN is present"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Setup Git user
+      # Author the release commit as the human who pushed (not the bot).
+      # The push itself is still done with GITHUB_TOKEN (so it counts as the bot's
+      # push for branch-protection purposes), but `git log` will show YOUR name.
+      # NOTE: This does NOT remove the need to `git pull` before your next push —
+      # any auto-publish flow that adds a commit to main requires that.
+      - name: Setup Git user (use the human pusher as author)
+        env:
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "$ACTOR"
+          git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies and bump version
@@ -351,8 +375,15 @@ jobs:
           npm ci
 
           echo "Bumping patch version..."
-          # Default behavior creates a commit AND an annotated tag locally
-          npm version patch -m "Release v%s [skip ci]" >/dev/null
+          # Multi-line commit message via bash ANSI-C quoting ($'...'):
+          #   Subject: "Release v0.2.6"     ← clean in `git log --oneline`
+          #   Body:    "[skip ci]"          ← still triggers GitHub's CI skip
+          #
+          # IMPORTANT: cannot use `-m "subject" -m "body"` here — npm's CLI parser
+          # collapses multiple -m flags to the last one (unlike git, which concatenates).
+          # The $'...' form embeds real \n characters; npm forwards the whole string
+          # to git commit which then renders subject + blank line + body correctly.
+          npm version patch -m $'Release v%s\n\n[skip ci]' >/dev/null
           # Read the canonical version from package.json (robust, no parsing)
           NEW_VERSION=$(node -p "require('./package.json').version")
           TAG_NAME="v${NEW_VERSION}"
@@ -387,7 +418,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -505,7 +536,7 @@ jobs:
             ```
 
             ### Verification
-            - ✅ Tested on Ubuntu, Windows, macOS (Node 20 LTS)
+            - ✅ Tested on Ubuntu, Windows, macOS (Node 24 LTS)
             - ✅ Security audit (npm audit --audit-level=high)
             - ✅ Published to npmjs.org
             - ✅ Mirrored to GitHub Packages
@@ -539,7 +570,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Set version from auto-version job
         env:
