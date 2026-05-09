@@ -56,8 +56,9 @@ program.addHelpCommand('help [command]', 'Display help for command');
 // ─── CAPTURE ─────────────────────────────────────────────────────────────────
 
 program
-  .command('capture')
+  .command('capture', { isDefault: false })
   .description('Capture a failing command as a .bug artifact')
+  .allowUnknownOption(true)
   .option('--include-untracked', 'Include untracked files (git ls-files -o)')
   .option('--skip-secrets', "Don't scan for secrets; skip confirmation")
   .option('--timeout <ms>', 'Command timeout in milliseconds', '300000')

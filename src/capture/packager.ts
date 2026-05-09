@@ -7,8 +7,8 @@ import { zipDirectory } from '../utils/archive.js';
 import { filterByExcludePatterns } from '../utils/exclude.js';
 import { isPathWithinBoundary } from '../utils/security.js';
 import { ArtifactManifest, EnvSchema, RunConfig, ArtifactMetadata } from '../types/artifact.js';
-import { FailureRecord } from '../types/failure.js';
 import { SourceStrategyResult } from './source-strategy.js';
+import { FailureRecord } from '../types/failure.js';
 import { EnvSnapshot } from './env-snapshot.js';
 import { ProjectLanguageContext } from './language-support.js';
 
@@ -71,6 +71,7 @@ export async function packageArtifact(
       options.runConfig.working_directory,
       options.includeUntracked ?? false,
       options.excludePatterns ?? [],
+      options.sourceStrategy,
     );
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
@@ -177,22 +178,28 @@ function copySourceFiles(
   workingDir: string,
   includeUntracked: boolean,
   excludePatterns: string[] = [],
+  sourceStrategy?: SourceStrategyResult,
 ): FileEntry[] {
-  const gitArgs = ['ls-files'];
-  if (includeUntracked) {
-    gitArgs.push('-o', '--exclude-standard');
-  }
+  let relativePaths: string[];
 
-  const result = spawnSync('git', gitArgs, { cwd: workingDir, encoding: 'utf-8' });
-  if (result.status !== 0) {
-    // Not a git repo or git not available — return empty file list
-    return [];
-  }
+  if (sourceStrategy && sourceStrategy.filesToInclude.length > 0) {
+    relativePaths = sourceStrategy.filesToInclude;
+  } else {
+    const gitArgs = ['ls-files'];
+    if (includeUntracked) {
+      gitArgs.push('-o', '--exclude-standard');
+    }
 
-  let relativePaths = result.stdout
-    .split('\n')
-    .map((f) => f.trim())
-    .filter((f) => f.length > 0);
+    const result = spawnSync('git', gitArgs, { cwd: workingDir, encoding: 'utf-8' });
+    if (result.status !== 0) {
+      return [];
+    }
+
+    relativePaths = result.stdout
+      .split('\n')
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0);
+  }
 
   // Apply --exclude patterns
   if (excludePatterns.length > 0) {

@@ -263,7 +263,7 @@ describe('CLI end-to-end', () => {
       const r = run('capture --skip-secrets -n no-git-test -- node crash.js', noGitDir);
       expect(r.status).toBe(0);
       expect(r.stdout).toContain('Artifact captured');
-      expect(r.stdout).toContain('0 files');
+      expect(r.stdout).toContain('1 files');
     } finally {
       fs.rmSync(noGitDir, { recursive: true, force: true });
     }
