@@ -58,9 +58,8 @@ permissions:
 # Environment variables for all jobs
 env:
   NODE_OPTIONS: --max-old-space-size=2048
-  # Opt into Node 24 runtime for JavaScript actions ahead of GitHub's June 2026
-  # forced cutover. Removes deprecation warnings from checkout/setup-node/etc.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Note: FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 is NOT needed anymore — we use @v5
+  # action versions which natively target Node 24.
 
 jobs:
   # ========================================
@@ -77,10 +76,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js 24 LTS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -111,7 +110,7 @@ jobs:
 
       - name: Upload test artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-logs-${{ matrix.os }}
           path: coverage/
@@ -129,10 +128,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -155,7 +154,7 @@ jobs:
         run: npm pack
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: package-tarball
           path: '*.tgz'
@@ -177,10 +176,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -188,7 +187,7 @@ jobs:
       # Download to a dedicated dir so any committed *.tgz in repo root
       # cannot collide with the freshly built artifact.
       - name: Download package tarball
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: package-tarball
           path: artifact
@@ -341,7 +340,7 @@ jobs:
           echo "✅ NPM_TOKEN is present"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -360,7 +359,7 @@ jobs:
           git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -410,13 +409,13 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ needs.auto-version.outputs.tag_name }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -511,47 +510,58 @@ jobs:
           rm -f .npmrc
           echo "::notice::Published @${OWNER_LC}/bugproof@${VERSION} to GitHub Packages"
 
-      # Static intro is appended above the auto-generated changelog so we keep
-      # both: install instructions + per-PR changelog from generate_release_notes.
-      - name: Create GitHub Release
+      # Use `gh release create` CLI (pre-installed on all GitHub runners) instead
+      # of a third-party action. This eliminates the last Node.js deprecation
+      # warning — gh CLI is a native Go binary with no Node runtime dependency.
+      #
+      # --generate-notes: GitHub auto-generates changelog from commits/PRs since
+      #                   the previous tag (same as the old action did).
+      # --notes-file:     our static intro (install instructions) is prepended.
+      - name: Create GitHub Release (via gh CLI, no Node dependency)
         if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Release v${{ env.VERSION }}
-          tag_name: ${{ needs.auto-version.outputs.tag_name }}
-          append_body: true
-          generate_release_notes: true
-          body: |
-            ## 📦 BugProof v${{ env.VERSION }}
-
-            ### Install from npmjs.org (recommended)
-            ```bash
-            npm install -g bugproof@${{ env.VERSION }}
-            ```
-
-            ### Install from GitHub Packages
-            ```bash
-            npm install -g @${{ github.repository_owner }}/bugproof@${{ env.VERSION }} \
-              --registry=https://npm.pkg.github.com
-            ```
-
-            ### Verification
-            - ✅ Tested on Ubuntu, Windows, macOS (Node 24 LTS)
-            - ✅ Security audit (npm audit --audit-level=high)
-            - ✅ Published to npmjs.org
-            - ✅ Mirrored to GitHub Packages
-
-            ### 🚀 Quick Start
-            ```bash
-            bugproof capture --skip-secrets -n my-artifact -- echo "Hello World"
-            ```
-
-            ---
-
-          draft: false
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.auto-version.outputs.tag_name }}
+          GH_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -e
+          # Build the static intro body (will be prepended to auto-generated notes)
+          cat > /tmp/release-intro.md <<EOF
+          ## 📦 BugProof v${VERSION}
+
+          ### Install from npmjs.org (recommended)
+          \`\`\`bash
+          npm install -g bugproof@${VERSION}
+          \`\`\`
+
+          ### Install from GitHub Packages
+          \`\`\`bash
+          npm install -g @${GH_OWNER}/bugproof@${VERSION} \\
+            --registry=https://npm.pkg.github.com
+          \`\`\`
+
+          ### Verification
+          - ✅ Tested on Ubuntu, Windows, macOS (Node 24 LTS)
+          - ✅ Security audit (npm audit --audit-level=high)
+          - ✅ Published to npmjs.org
+          - ✅ Mirrored to GitHub Packages
+
+          ### 🚀 Quick Start
+          \`\`\`bash
+          bugproof capture --skip-secrets -n my-artifact -- echo "Hello World"
+          \`\`\`
+
+          ---
+
+          EOF
+
+          echo "Creating GitHub Release for tag ${TAG_NAME}..."
+          gh release create "${TAG_NAME}" \
+            --title "Release v${VERSION}" \
+            --notes-file /tmp/release-intro.md \
+            --generate-notes \
+            --latest
+          echo "::notice::GitHub Release created for v${VERSION}"
 
   # ========================================
   # Phase 6: Post-Publish Verification
@@ -565,10 +575,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
 
