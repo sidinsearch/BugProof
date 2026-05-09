@@ -5,8 +5,7 @@ import * as path from 'path';
  * This ensures artifact portability between Windows, Linux, and macOS.
  */
 export function normalizeArtifactPath(p: string): string {
-  // Use posix-style normalization for the artifact internal representations
-  return p.split(path.sep).join(path.posix.sep);
+  return p.replace(/\\/g, '/');
 }
 
 /**
