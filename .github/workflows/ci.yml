@@ -58,8 +58,16 @@ permissions:
 # Environment variables for all jobs
 env:
   NODE_OPTIONS: --max-old-space-size=2048
-  # Note: FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 is NOT needed anymore — we use @v5
-  # action versions which natively target Node 24.
+  # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: official GitHub-recommended opt-in
+  # (per the deprecation warning text itself). Required because some @v5 actions
+  # still declare Node 20 internally:
+  #   - actions/upload-artifact@v5   (latest; v6 not released)
+  #   - actions/download-artifact@v5 (latest; v6 not released)
+  #   - actions/github-script (SHA-pinned inside codecov-action@v5's bundle)
+  # With this flag set, those actions run on Node 24 with informational notices
+  # instead of "may-not-work" deprecation warnings.
+  # On June 2, 2026, GitHub flips this default ON globally and all notices disappear.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ========================================
