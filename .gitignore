@@ -123,7 +123,14 @@ Thumbs.db
 *.code-workspace
 
 # --------------------------------------------------------------------
-# 8. Executables & Logs
+# 8. Local Development Scripts (SSH helpers, test env setup)
+# --------------------------------------------------------------------
+scripts/ssh_helper.py
+scripts/ssh_copy_key.py
+scripts/setup_linux_tests.py
+
+# --------------------------------------------------------------------
+# 9. Executables & Logs
 # --------------------------------------------------------------------
 *.exe
 *.dll
