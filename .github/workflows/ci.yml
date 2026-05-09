@@ -144,9 +144,12 @@ jobs:
       - name: Run security audit (production deps only)
         run: npm audit --omit=dev --audit-level=high
 
+      # `npm outdated` exits 1 when ANY package is outdated — by design, not a real error.
+      # Pipe through `|| true` so the step shows green; this is purely informational.
       - name: Report outdated dependencies (informational)
-        continue-on-error: true
-        run: npm outdated
+        run: |
+          echo "ℹ️  Outdated dependency report (informational only — never fails the build):"
+          npm outdated || true
 
       - name: Create package tarball
         run: npm pack
