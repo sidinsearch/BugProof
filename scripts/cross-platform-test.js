@@ -37,7 +37,9 @@ async function run() {
 
   // Pack project into tarball (excluding node_modules and .git) to transfer faster
   console.log('   Running npm pack...');
-  const tarballName = execSync('npm pack', { encoding: 'utf8' }).trim();
+  const tarballRaw = execSync('npm pack --ignore-scripts', { encoding: 'utf8' });
+  const tarballName = tarballRaw.trim().split('\n').filter(l => l.endsWith('.tgz')).pop();
+  if (!tarballName) throw new Error('Failed to determine tarball name from npm pack output');
   const tarballPath = path.join(ROOT_DIR, tarballName);
 
   // Capture a Windows artifact

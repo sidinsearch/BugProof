@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![BugProof Logo](assets/icon-512x512.png?raw=true&size=200)
+<img src="assets/icon-512x512.png" width="200" alt="BugProof Logo">
 
 **Executable bugs, not bug reports.**
 

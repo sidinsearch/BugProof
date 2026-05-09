@@ -14,7 +14,7 @@ import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.
 import { FailureRecord } from './types/failure.js';
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
-import { banner, success, warn, error, info, kvLine, c, icons } from './utils/ui.js';
+import { banner, section, success, warn, error, info, kvLine, c, icons, statusBadge } from './utils/ui.js';
 import { loadConfig, generateDefaultConfig, applyNameTemplate } from './config/loader.js';
 import { generateHints } from './replay/hints.js';
 import { shareToGist } from './share/gist.js';
@@ -64,7 +64,7 @@ program
   .option('--timeout <ms>', 'Command timeout in milliseconds', '300000')
   .option('-n, --name <name>', 'Human-readable name for the artifact')
   .option('-d, --description <desc>', 'Description of the bug being captured')
-  .option('-e, --exclude <pattern>', 'Exclude files matching glob pattern (repeatable)', (v: string, arr: string[]) => {
+  .option('-x, --exclude <pattern>', 'Exclude files matching glob pattern (repeatable)', (v: string, arr: string[]) => {
     arr.push(v);
     return arr;
   }, [] as string[])
@@ -269,7 +269,7 @@ program
         const deps = detectMissingDependencies(result.stderr);
         if (deps.length > 0) {
           console.log();
-          console.log(c.bold('  Missing Dependencies Detected'));
+          section('Missing Dependencies');
           for (const dep of deps) {
             console.log(`    ${c.yellow(icons.arrow)} ${c.bold(dep.name)} (${dep.language})`);
             console.log(`      ${c.dim(dep.installCommand)}`);
@@ -327,7 +327,17 @@ program
         if (!jsonMode) info('Extracting compressed artifact...');
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-extract-'));
         targetPath = tempDir;
-        await extractZip(artifact, tempDir);
+        try {
+          await extractZip(artifact, tempDir);
+        } catch {
+          if (jsonMode) {
+            console.log(JSON.stringify({ reproduced: false, error: 'Corrupted artifact: Invalid or damaged .bug file' }));
+          } else {
+            error('Corrupted artifact: Invalid or damaged .bug file');
+            info('The file may not be a valid .bug artifact or may be truncated.');
+          }
+          process.exit(1);
+        }
       }
 
       let manifest: ArtifactManifest;
@@ -372,7 +382,7 @@ program
 
           const warnings = mismatches.filter(m => m.severity === 'warning' || m.severity === 'error');
           if (warnings.length > 0) {
-            console.log(c.bold('  Environment Mismatches'));
+            section('Environment Mismatches');
             for (const m of warnings) {
               const icon = m.severity === 'error' ? c.red(icons.cross) : c.yellow(icons.dot);
               console.log(`    ${icon} ${m.message}`);
@@ -425,7 +435,7 @@ program
 
       // Show cross-platform warnings/translations before verdict
       if (replayResult.crossPlatform) {
-        console.log(c.bold('  Cross-Platform Translation'));
+        section('Cross-Platform Translation');
         for (const w of replayResult.crossPlatform.warnings) {
           console.log(`    ${c.yellow(icons.dot)} ${w}`);
         }
@@ -452,8 +462,7 @@ program
       kvLine('Verdict', verdict.message);
       
       if (replayResult.bugBox && replayResult.bugBox.level !== 'workspace') {
-        console.log();
-        console.log(c.bold('  Bug-Box Sandbox'));
+        section('Bug-Box Sandbox');
         kvLine('Level', replayResult.bugBox.level);
         kvLine('Applied', replayResult.bugBox.appliedLayers.join(', ') || 'none');
         if (replayResult.bugBox.skippedLayers.length > 0) {
@@ -465,8 +474,7 @@ program
       if (verdict.status !== 'confirmed') {
         const hints = generateHints(expectedFailure, replayResult.actualFailure, replayResult.actualStderr);
         if (hints.length > 0) {
-          console.log();
-          console.log(c.bold('  Hints'));
+          section('Hints');
           for (const hint of hints) {
             const icon = hint.confidence === 'high' ? icons.arrow : icons.dot;
             console.log(`    ${c.yellow(icon)} ${c.bold(hint.title)}`);
@@ -480,15 +488,13 @@ program
           try {
             const langCtx = JSON.parse(fs.readFileSync(langCtxPath, 'utf-8'));
             if (langCtx.buildCommands && langCtx.buildCommands.length > 0) {
-              console.log();
-              console.log(c.bold('  Build Steps Required'));
+              section('Build Steps Required');
               for (const cmd of langCtx.buildCommands) {
                 console.log(`    ${c.cyan(icons.arrow)} ${cmd}`);
               }
             }
             if (langCtx.warnings && langCtx.warnings.length > 0) {
-              console.log();
-              console.log(c.bold('  Language Warnings'));
+              section('Language Warnings');
               for (const w of langCtx.warnings) {
                 console.log(`    ${c.yellow(icons.dot)} ${w}`);
               }
@@ -541,7 +547,17 @@ program
         if (!jsonMode) info('Extracting compressed artifact...');
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-extract-'));
         targetPath = tempDir;
-        await extractZip(artifact, tempDir);
+        try {
+          await extractZip(artifact, tempDir);
+        } catch {
+          if (jsonMode) {
+            console.log(JSON.stringify({ error: 'Corrupted artifact: Invalid or damaged .bug file' }));
+          } else {
+            error('Corrupted artifact: Invalid or damaged .bug file');
+            info('The file may not be a valid .bug artifact or may be truncated.');
+          }
+          process.exit(1);
+        }
       }
 
       const manifestRaw = fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8');
@@ -559,10 +575,10 @@ program
       return;
     }
 
-    banner(`${icons.box} BugProof Inspect`);
+    banner('BugProof Inspect');
 
     // Manifest
-    console.log(c.bold('  Manifest'));
+    section('Manifest');
     kvLine('Name', manifest.name);
     kvLine('Description', manifest.description);
     kvLine('Version', `${manifest.bugproof_version} (format ${manifest.version})`);
@@ -580,7 +596,7 @@ program
     console.log();
 
     // Failure
-    console.log(c.bold('  Failure'));
+    section('Failure');
     kvLine('Exit code', String(failure.exit_code));
     kvLine('Signal', failure.signal || 'none');
     kvLine('Duration', `${failure.duration_ms}ms`);
@@ -594,8 +610,7 @@ program
 
     // Stderr snippet
     if (failure.stderr_snippet) {
-      console.log(c.bold('  Stderr (last 5 lines)'));
-      console.log(c.dim('  ' + '\u2500'.repeat(38)));
+      section('Stderr (last 5 lines)');
       for (const line of failure.stderr_snippet.split('\n')) {
         console.log(`  ${c.red(line)}`);
       }
@@ -606,7 +621,7 @@ program
 
     // Files summary
     if (files.length > 0) {
-      console.log(c.bold(`  Files (${files.length} captured)`));
+      section(`Files (${files.length} captured)`);
       const shown = files.slice(0, 15);
       for (const f of shown) {
         const sizeKB = (f.size / 1024).toFixed(1);
@@ -621,8 +636,7 @@ program
 
     // Secrets
     if (manifest.secrets_detected) {
-      console.log();
-      console.log(c.bold('  Secrets (redacted)'));
+      section('Secrets (redacted)');
       for (const s of manifest.secrets_skipped) {
         console.log(`    ${c.yellow(icons.dot)} ${s}`);
       }
@@ -700,7 +714,7 @@ program
       return;
     }
 
-    banner(`${icons.box} BugProof Diff`);
+    banner('BugProof Diff');
 
     kvLine('Left', left.manifest.name);
     kvLine('Right', right.manifest.name);
@@ -714,7 +728,7 @@ program
 
     // Property changes
     if (result.changes.length > 0) {
-      console.log(c.bold('  Property Changes'));
+      section('Property Changes');
       for (const ch of result.changes) {
         console.log(`    ${c.yellow(ch.field)}`);
         console.log(`      ${c.red('- ' + String(ch.left))}`);
@@ -728,7 +742,7 @@ program
       const fc = result.fileChanges;
       const hasChanges = fc.added.length > 0 || fc.removed.length > 0 || fc.modified.length > 0;
       if (hasChanges) {
-        console.log(c.bold('  File Changes'));
+        section('File Changes');
         for (const f of fc.added) {
           console.log(`    ${c.green('+ ' + f)}`);
         }
