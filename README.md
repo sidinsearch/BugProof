@@ -1,4 +1,4 @@
-﻿# BugProof
+# BugProof
 
 <div align="center">
 
@@ -143,6 +143,7 @@ bugproof replay --version-match strict my-bug.bug
 bugproof replay --version-match branch my-bug.bug
 bugproof replay --sandbox isolated my-bug.bug
 bugproof replay --env API_URL=https://staging.local --env DEBUG=true my-bug.bug
+bugproof replay --replay-count 5 my-bug.bug
 bugproof replay --json my-bug.bug
 ```
 
@@ -150,6 +151,7 @@ Options:
 - `--version-match <mode>` `strict | current | branch` (default: `current`)
 - `--sandbox <level>` `workspace | isolated | full` (default: `workspace`)
 - `--env <var=value>` Override environment variable (repeatable)
+- `--replay-count <n>` Run the replay up to N times (useful for flaky bugs/race conditions)
 - `--json` Structured JSON output
 
 ### `bugproof inspect <artifact>`
@@ -236,11 +238,27 @@ bugproof share my-bug.bug
 bugproof share --public my-bug.bug
 ```
 
-Requires `GITHUB_TOKEN` or `BUGPROOF_GITHUB_TOKEN` env var with `gist` scope.
+Requires `GITHUB_TOKEN` or `BUGPROOF_GITHUB_TOKEN` env var with `gist` scope. Automatically respects `HTTP_PROXY` and `HTTPS_PROXY` for corporate environments.
 
 Options:
 - `--public` Create a public gist (default: secret/unlisted)
 - `--json` Structured JSON output
+
+### `bugproof prune`
+
+Clean up orphaned temporary directories and sandbox containers from aborted runs to reclaim disk space.
+
+```bash
+bugproof prune
+```
+
+### `bugproof doctor`
+
+Run a self-diagnostic to verify host OS support for native sandboxing features (Job Objects, Linux namespaces, Apple Seatbelt).
+
+```bash
+bugproof doctor
+```
 
 ## Smart Features
 
@@ -356,6 +374,7 @@ bash scripts/bugproof-file-association-macos.sh
 | macOS | Yes | Yes | Yes |
 
 Notes:
+- **Cross-Architecture Guardrails**: BugProof actively detects and warns on CPU architecture mismatches (e.g., replaying an `x64` bug on an `arm64` machine), advising on Rosetta/translation impacts.
 - Exit codes may differ by OS for signals/crashes.
 - Fingerprint/error-pattern matching is used for reproduction verdict.
 
