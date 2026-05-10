@@ -16,6 +16,8 @@ export interface ReplayOptions {
   sandboxLevel?: 'workspace' | 'isolated' | 'full';
   /** Platform the artifact was captured on (for cross-platform translation) */
   capturedPlatform?: string;
+  /** Architecture the artifact was captured on */
+  capturedArch?: string;
 }
 
 export interface ReplayResult {
@@ -74,7 +76,8 @@ export async function replayArtifact(
   try {
     // 2. Cross-platform detection and translation
     const capturedPlatform = options.capturedPlatform || process.platform;
-    const crossPlatform = detectCrossPlatform(capturedPlatform);
+    const capturedArch = options.capturedArch || process.arch;
+    const crossPlatform = detectCrossPlatform(capturedPlatform, process.platform, capturedArch, process.arch);
 
     let replayCommand = runConfig.command;
     const allTranslations: string[] = [];

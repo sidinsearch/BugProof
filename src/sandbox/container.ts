@@ -137,7 +137,7 @@ export function createContainer(config: ContainerConfig): ContainerResult {
     for (const layer of winResult.layers) layers.push(layer);
     cleanupFns.push(...winResult.cleanupFns);
   } else if (caps.platform === 'darwin') {
-    const macResult = applyMacIsolation(command, caps, config, workingDir);
+    const macResult = applyMacIsolation(command, caps, config, workingDir, containerTmp);
     command = macResult.command;
     for (const layer of macResult.layers) layers.push(layer);
   }
@@ -342,6 +342,7 @@ function applyMacIsolation(
   caps: PlatformCapabilities,
   config: ContainerConfig,
   workingDir: string,
+  containerTmp: string,
 ): { command: string[]; layers: ContainerLayer[] } {
   const layers: ContainerLayer[] = [];
   let cmd = [...command];
@@ -359,9 +360,11 @@ function applyMacIsolation(
     // Restrict filesystem writes to working directory and temp
     if (config.filesystem !== 'full') {
       profileParts.push(
-        `(deny file-write* (subpath "/") (require-not (subpath "${workingDir}")))`,
+        `(deny file-write* (subpath "/"))`,
+        `(allow file-write* (subpath "${workingDir}"))`,
+        `(allow file-write* (subpath "${containerTmp}"))`
       );
-      layers.push({ name: 'fs-sandbox', applied: true, reason: 'Filesystem writes restricted to workspace' });
+      layers.push({ name: 'fs-sandbox', applied: true, reason: 'Filesystem writes restricted to workspace and tmp' });
     }
 
     const profile = profileParts.join('');

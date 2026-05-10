@@ -26,6 +26,10 @@ export interface CrossPlatformContext {
   capturedPlatform: string;
   /** OS we're replaying on */
   replayPlatform: string;
+  /** Architecture the bug was captured on */
+  capturedArch?: string;
+  /** Architecture we're replaying on */
+  replayArch?: string;
   /** Whether cross-platform translation is needed */
   needsTranslation: boolean;
   /** Whether replay is likely to succeed */
@@ -58,9 +62,12 @@ export interface TranslatedEnvironment {
 export function detectCrossPlatform(
   capturedPlatform: string,
   replayPlatform?: string,
+  capturedArch?: string,
+  replayArch?: string
 ): CrossPlatformContext {
   const replay = replayPlatform || os.platform();
-  const needsTranslation = capturedPlatform !== replay;
+  const currentArch = replayArch || os.arch();
+  const needsTranslation = capturedPlatform !== replay || (!!capturedArch && capturedArch !== currentArch);
   const warnings: string[] = [];
   let likelyCompatible = true;
 
@@ -85,9 +92,18 @@ export function detectCrossPlatform(
       likelyCompatible = true; // Optimistic — we'll catch hard failures in command translation
       warnings.push('Cross-family translation applied. Path separators and commands will be adapted.');
     }
+
+    if (capturedArch && currentArch && capturedArch !== currentArch) {
+      warnings.push(`Architecture mismatch: captured on ${capturedArch}, replaying on ${currentArch}.`);
+      if (replay === 'darwin' && capturedArch === 'x64' && currentArch === 'arm64') {
+        warnings.push('macOS Rosetta translation will be used for x64 binaries.');
+      } else {
+        warnings.push('Compiled native binaries (e.g. C++ add-ons, Rust binaries) may fail to execute.');
+      }
+    }
   }
 
-  return { capturedPlatform, replayPlatform: replay, needsTranslation, likelyCompatible, warnings };
+  return { capturedPlatform, replayPlatform: replay, capturedArch, replayArch: currentArch, needsTranslation, likelyCompatible, warnings };
 }
 
 /**

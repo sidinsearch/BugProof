@@ -2,6 +2,8 @@ import { spawn, ChildProcess } from 'child_process';
 import { RunConfig } from '../types/artifact.js';
 import { FailureRecord } from '../types/failure.js';
 import { generateExactFingerprint, extractErrorPatterns } from '../utils/fingerprint.js';
+import { sanitizePII } from '../utils/secrets.js';
+
 
 /**
  * Spawns the command, captures its output, and produces a FailureRecord.
@@ -50,7 +52,8 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
       });
     } catch (err) {
       // Command not found or spawn error
-      const errStr = String(err);
+      let errStr = String(err);
+      errStr = sanitizePII(errStr);
       safeResolve({
         failure: {
           exit_code: 1,
@@ -98,6 +101,9 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
       
       const duration = Date.now() - startTime;
       
+      stdoutBuffer = sanitizePII(stdoutBuffer);
+      stderrBuffer = sanitizePII(stderrBuffer);
+
       // Determine snippet (last 5 lines of stderr)
       const lines = stderrBuffer.trim().split('\n');
       const snippet = lines.slice(Math.max(0, lines.length - 5)).join('\n');
@@ -123,7 +129,8 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
     
     proc.on('error', (err) => {
       clearTimeout(timeoutHandle);
-      const errStr = String(err);
+      let errStr = String(err);
+      errStr = sanitizePII(errStr);
       stderrBuffer += errStr;
       
       safeResolve({

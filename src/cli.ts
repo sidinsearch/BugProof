@@ -6,6 +6,7 @@ import * as path from 'path';
 import { executeAndCapture } from './capture/engine.js';
 import { packageArtifact } from './capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from './utils/secrets.js';
+import { detectCapabilities } from './sandbox/capabilities.js';
 import { getGitContext } from './utils/git.js';
 import { formatCaptureJson, formatReplayJson, formatInspectJson } from './utils/json-output.js';
 import { extractZip } from './utils/archive.js';
@@ -14,11 +15,12 @@ import { RunConfig, ArtifactManifest, ArtifactMetadata } from './types/artifact.
 import { FailureRecord } from './types/failure.js';
 import { replayArtifact } from './replay/engine.js';
 import { generateVerdict } from './replay/verdict.js';
-import { banner, section, success, warn, error, info, kvLine, c, icons } from './utils/ui.js';
+import { banner, section, success, warn, error, info, kvLine, c, icons, Spinner, statusBadge } from './utils/ui.js';
 import { loadConfig, generateDefaultConfig, applyNameTemplate } from './config/loader.js';
 import { generateHints } from './replay/hints.js';
 import { shareToGist } from './share/gist.js';
 import { sanitizeShareError } from './share/gist.js';
+import { pruneTempDirectories } from './utils/cleanup.js';
 import { detectMissingDependencies } from './utils/dependencies.js';
 import { determineSourceStrategy } from './capture/source-strategy.js';
 import { captureEnvSnapshot, compareEnvSnapshots, EnvSnapshot } from './capture/env-snapshot.js';
@@ -304,6 +306,7 @@ program
     return arr;
   }, [] as string[])
   .option('--json', 'Output structured JSON instead of human-readable text')
+  .option('--replay-count <n>', 'Number of times to retry replay for flaky bugs', '1')
   .action(async (artifact: string, options) => {
     const jsonMode = options.json === true;
 
@@ -322,14 +325,20 @@ program
     let targetPath = artifact;
     let tempDir: string | undefined;
 
+    let extractSpinner: Spinner | undefined;
     try {
       if (stat.isFile()) {
-        if (!jsonMode) info('Extracting compressed artifact...');
+        if (!jsonMode) {
+          extractSpinner = new Spinner('Extracting compressed artifact');
+          extractSpinner.start();
+        }
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-extract-'));
         targetPath = tempDir;
         try {
           await extractZip(artifact, tempDir);
+          extractSpinner?.stop();
         } catch {
+          extractSpinner?.stop();
           if (jsonMode) {
             console.log(JSON.stringify({ reproduced: false, error: 'Corrupted artifact: Invalid or damaged .bug file' }));
           } else {
@@ -408,17 +417,35 @@ program
       console.log();
     }
 
-      const replayResult = await replayArtifact(runConfig, expectedFailure, {
+    const replayCount = parseInt(options.replayCount, 10) || 1;
+    let replayResult: any;
+    let verdict: any;
+
+    for (let i = 0; i < replayCount; i++) {
+      if (replayCount > 1 && !jsonMode) {
+        info(`Replay attempt ${i + 1}/${replayCount}...`);
+      }
+
+      replayResult = await replayArtifact(runConfig, expectedFailure, {
         artifactPath: targetPath,
         versionMatch: options.versionMatch,
-      sandboxLevel: options.sandbox,
-      envOverrides,
-      gitCommit: manifest.captured_on.git_commit,
-      gitBranch: manifest.captured_on.git_branch,
-      capturedPlatform: manifest.captured_on.os,
-    });
+        sandboxLevel: options.sandbox,
+        envOverrides,
+        gitCommit: manifest.captured_on.git_commit,
+        gitBranch: manifest.captured_on.git_branch,
+        capturedPlatform: manifest.captured_on.os,
+        capturedArch: manifest.captured_on.arch,
+      });
 
-    const verdict = generateVerdict(replayResult);
+      verdict = generateVerdict(replayResult);
+
+      if (verdict.status === 'confirmed') {
+        if (replayCount > 1 && !jsonMode) {
+          success(`Reproduced successfully on attempt ${i + 1}!`);
+        }
+        break;
+      }
+    }
 
     if (jsonMode) {
       console.log(formatReplayJson({
@@ -885,6 +912,12 @@ program
     }
     const artifactPath = path.join(artifactDir, `${artifactName}.bug`);
 
+    let packSpinner: Spinner | undefined;
+    if (!jsonMode) {
+      packSpinner = new Spinner('Packaging artifact');
+      packSpinner.start();
+    }
+
     try {
       const packResult = await packageArtifact(artifactPath, {
         manifest,
@@ -912,6 +945,7 @@ program
           },
         }, null, 2));
       } else {
+        packSpinner?.stop();
         console.log();
         success(`Artifact auto-captured: ${c.cyan(artifactPath)}`);
         kvLine('Files', `${packResult.filesCount} files (${(packResult.totalSize / 1024).toFixed(1)} KB)`);
@@ -925,7 +959,7 @@ program
       if (jsonMode) {
         console.log(JSON.stringify({ success: false, error: String(err) }));
       } else {
-        error(`Auto-capture failed: ${err}`);
+        packSpinner?.stop(`Auto-capture failed: ${err}`, true);
       }
     }
 
@@ -974,9 +1008,11 @@ program
       process.exit(1);
     }
 
+    let spinner: Spinner | undefined;
     if (!jsonMode) {
       banner(`${icons.arrow} BugProof Share`);
-      info('Uploading artifact to GitHub Gist...');
+      spinner = new Spinner('Uploading artifact to GitHub Gist');
+      spinner.start();
     }
 
     try {
@@ -989,8 +1025,7 @@ program
           gist_id: result.gistId,
         }, null, 2));
       } else {
-        console.log();
-        success('Artifact shared!');
+        spinner?.stop('Artifact shared!');
         console.log();
         kvLine('URL', c.cyan(result.url));
         kvLine('Gist ID', result.gistId);
@@ -1002,10 +1037,66 @@ program
       if (jsonMode) {
         console.log(JSON.stringify({ success: false, error: sanitizeShareError(String(err)) }));
       } else {
-        error(sanitizeShareError(String(err)));
+        spinner?.stop(sanitizeShareError(String(err)), true);
       }
       process.exit(1);
     }
+  });
+
+// ─── PRUNE ──────────────────────────────────────────────────────────────────
+
+program
+  .command('prune')
+  .description('Clean up temporary sandbox and artifact directories')
+  .action(() => {
+    banner(`${icons.arrow} BugProof Prune`);
+    info('Scanning temporary directories...');
+    const result = pruneTempDirectories();
+    if (result.prunedCount === 0) {
+      success('Nothing to clean up. Temp directory is pristine.');
+    } else {
+      success(`Pruned ${result.prunedCount} orphan directories.`);
+      kvLine('Reclaimed', `${(result.prunedBytes / 1024 / 1024).toFixed(2)} MB`);
+    }
+    console.log();
+  });
+
+// ─── DOCTOR ─────────────────────────────────────────────────────────────────
+
+program
+  .command('doctor')
+  .description('Verify host OS support for sandboxing and features')
+  .action(() => {
+    banner(`${icons.arrow} BugProof Doctor`);
+    const caps = detectCapabilities();
+
+    section('Host Information');
+    kvLine('OS', `${os.type()} ${os.release()}`);
+    kvLine('Platform', caps.platform);
+    kvLine('Architecture', os.arch());
+    kvLine('Node Version', process.version);
+    console.log();
+
+    section('Sandbox Capabilities');
+    if (caps.platform === 'linux') {
+      statusBadge('Linux unshare (Namespaces)', caps.hasUnshare);
+      statusBadge('cgroups v2 (Resource Limits)', caps.hasCgroupsV2);
+      if (!caps.hasUnshare) {
+        warn('Missing unshare. BugProof will run without namespace isolation.');
+      }
+    } else if (caps.platform === 'win32') {
+      statusBadge('Job Objects (Process Isolation)', caps.hasJobObjects);
+      statusBadge('netsh (Network Firewall)', caps.hasNetsh);
+    } else if (caps.platform === 'darwin') {
+      statusBadge('sandbox-exec (Apple Seatbelt)', caps.hasSandboxExec);
+      if (!caps.hasSandboxExec) {
+        warn('Missing sandbox-exec. macOS sandbox profile isolation will be disabled.');
+      }
+    } else {
+      warn(`Unsupported platform for native sandboxing: ${caps.platform}`);
+    }
+
+    console.log();
   });
 
 program.parse(process.argv);

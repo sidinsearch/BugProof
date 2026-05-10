@@ -1,4 +1,4 @@
-import { scanEnvironmentForSecrets, buildEnvironmentSchema } from '../../src/utils/secrets';
+import { scanEnvironmentForSecrets, buildEnvironmentSchema, sanitizePII } from '../../src/utils/secrets';
 
 describe('Secrets Utility', () => {
   describe('scanEnvironmentForSecrets', () => {
@@ -55,6 +55,41 @@ describe('Secrets Utility', () => {
       expect(schema.secrets).toEqual(['API_KEY']);
       expect(schema.optional).toEqual(['MY_APP_DEBUG']);
       expect(schema.required).toEqual([]); // Empty by default
+    });
+  });
+
+  describe('sanitizePII', () => {
+    it('should mask email addresses', () => {
+      const text = 'Contact me at admin@example.com for more info.';
+      expect(sanitizePII(text)).toBe('Contact me at [REDACTED_EMAIL] for more info.');
+    });
+
+    it('should mask IPv4 addresses', () => {
+      const text = 'Failed to connect to 192.168.1.100.';
+      expect(sanitizePII(text)).toBe('Failed to connect to [REDACTED_IP].');
+    });
+
+    it('should mask Stripe API keys', () => {
+      const text = 'Using key sk_live_51Habcdefghijklmnopqrstuvwxyz';
+      expect(sanitizePII(text)).toBe('Using key [REDACTED_STRIPE_KEY]');
+    });
+
+    it('should mask GitHub tokens', () => {
+      const text = 'Found token ghp_123456789012345678901234567890123456 in env.';
+      expect(sanitizePII(text)).toBe('Found token [REDACTED_GITHUB_TOKEN] in env.');
+    });
+
+    it('should mask Credit Card numbers', () => {
+      const text = 'Payment failed for card 4111-1111-1111-1111 on checkout.';
+      expect(sanitizePII(text)).toBe('Payment failed for card [REDACTED_CREDIT_CARD] on checkout.');
+      
+      const text2 = 'Another card 4111111111111111 failed.';
+      expect(sanitizePII(text2)).toBe('Another card [REDACTED_CREDIT_CARD] failed.');
+    });
+
+    it('should leave normal text alone', () => {
+      const text = 'This is a normal log message with numbers 1234 and words.';
+      expect(sanitizePII(text)).toBe(text);
     });
   });
 });

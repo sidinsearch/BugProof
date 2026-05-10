@@ -74,3 +74,46 @@ export function statusBadge(label: string, ok: boolean): void {
   const badge = ok ? c.green('[' + icons.check + ']') : c.red('[' + icons.cross + ']');
   console.log('    ' + badge + ' ' + label);
 }
+
+export class Spinner {
+  private frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  private currentFrame = 0;
+  private interval: NodeJS.Timeout | null = null;
+  private message: string;
+
+  constructor(message: string) {
+    this.message = message;
+  }
+
+  start() {
+    if (!process.stdout.isTTY) {
+      console.log(`  ${c.blue(icons.arrow)}  ${this.message}...`);
+      return;
+    }
+    process.stdout.write(`\x1B[?25l`); // Hide cursor
+    this.interval = setInterval(() => {
+      this.render();
+    }, 80);
+  }
+
+  private render() {
+    process.stdout.write(`\r  ${c.cyan(this.frames[this.currentFrame])}  ${this.message}`);
+    this.currentFrame = (this.currentFrame + 1) % this.frames.length;
+  }
+
+  stop(successMsg?: string, isError = false) {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+      process.stdout.write('\r\x1B[K'); // clear line
+      process.stdout.write('\x1B[?25h'); // show cursor
+      if (successMsg) {
+        if (isError) {
+          error(successMsg);
+        } else {
+          success(successMsg);
+        }
+      }
+    }
+  }
+}

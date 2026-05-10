@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as https from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import { extractZip } from '../utils/archive.js';
 
 export interface ShareResult {
@@ -150,11 +151,15 @@ ${manifest.files_count} files captured (${(manifest.files_size_bytes / 1024).toF
 function httpPost(url: string, data: string, token: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
-    const options = {
+    const proxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy;
+    const agent = proxy ? new HttpsProxyAgent(proxy) : undefined;
+
+    const options: https.RequestOptions = {
       hostname: urlObj.hostname,
       port: 443,
       path: urlObj.pathname,
       method: 'POST',
+      agent,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,

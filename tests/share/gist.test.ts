@@ -1,5 +1,6 @@
 import { sanitizeShareError } from '../../src/share/gist';
 
+jest.mock('https-proxy-agent', () => ({ HttpsProxyAgent: class {} }));
 describe('share error sanitization', () => {
   it('redacts bearer tokens', () => {
     const value = 'GitHub API error 401: Authorization: Bearer ghp_secret123';

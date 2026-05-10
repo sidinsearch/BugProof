@@ -60,3 +60,20 @@ export function buildEnvironmentSchema(env: NodeJS.ProcessEnv, detectedSecrets: 
   
   return { required, optional, secrets, captured_env_keys };
 }
+
+const PII_PATTERNS = [
+  { regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, replacement: '[REDACTED_EMAIL]' },
+  { regex: /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g, replacement: '[REDACTED_IP]' },
+  { regex: /\b(sk_live|sk_test|pk_live|pk_test)_[0-9a-zA-Z]{20,}\b/g, replacement: '[REDACTED_STRIPE_KEY]' },
+  { regex: /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}\b/g, replacement: '[REDACTED_GITHUB_TOKEN]' },
+  { regex: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, replacement: '[REDACTED_CREDIT_CARD]' }
+];
+
+export function sanitizePII(text: string): string {
+  if (!text) return text;
+  let sanitized = text;
+  for (const { regex, replacement } of PII_PATTERNS) {
+    sanitized = sanitized.replace(regex, replacement);
+  }
+  return sanitized;
+}

@@ -21,4 +21,7 @@ export default {
       statements: 70,
     },
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(https-proxy-agent|agent-base|debug)/)',
+  ],
 };

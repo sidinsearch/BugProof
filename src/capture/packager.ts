@@ -37,8 +37,9 @@ export interface FileEntry {
   sha256: string;
 }
 
-const MAX_ARTIFACT_SIZE = 50 * 1024 * 1024; // 50MB hard limit per DESIGN.md
-const WARN_THRESHOLD    = 10 * 1024 * 1024; // 10MB warning per DESIGN.md
+const MAX_ARTIFACT_SIZE = 100 * 1024 * 1024; // 100MB hard limit
+const WARN_THRESHOLD    = 50 * 1024 * 1024;  // 50MB warning
+const MAX_FILE_COUNT    = 10000;            // 10k files hard limit
 
 /**
  * Packages the artifact into the .bug directory format specified in DESIGN.md.
@@ -224,11 +225,18 @@ function copySourceFiles(
 
     runningSize += stats.size;
 
-    if (runningSize > MAX_ARTIFACT_SIZE) {
-      throw new Error(
-        `Artifact would exceed the 50 MB limit (currently ${(runningSize / 1024 / 1024).toFixed(1)} MB). ` +
-          'Add large files to .gitignore or use --exclude patterns.',
+    if (runningSize > MAX_ARTIFACT_SIZE || entries.length >= MAX_FILE_COUNT) {
+      process.stderr.write(
+        `\n  [WARNING] Repository exceeds hardware limits (50MB or 10,000 files).\n` +
+        `  Gracefully falling back to "stacktrace-only" mode. The bug artifact will\n` +
+        `  contain the command, logs, and environment, but NO source files.\n\n`
       );
+      
+      // Clean up partially copied files
+      fs.rmSync(filesDir, { recursive: true, force: true });
+      fs.mkdirSync(filesDir, { recursive: true });
+      
+      return [];
     }
 
     if (runningSize > WARN_THRESHOLD && entries.length > 0 && entries.length % 50 === 0) {
