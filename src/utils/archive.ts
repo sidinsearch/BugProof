@@ -86,6 +86,9 @@ export async function extractZip(zipPath: string, destDir: string): Promise<void
       },
     });
   } catch (err) {
-    throw new Error(`Failed to extract artifact: ${err instanceof Error ? err.message : err}`);
+    const error = err instanceof Error ? err : new Error(String(err));
+    const extractError = new Error(`Failed to extract artifact: ${error.message}`);
+    extractError.cause = error;
+    throw extractError;
   }
 }

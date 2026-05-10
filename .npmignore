@@ -1,4 +1,4 @@
-# Ignore development files and build artifacts
+﻿# Ignore development files and build artifacts
 node_modules/
 coverage/
 dist/*.d.ts
@@ -33,19 +33,9 @@ reports/
 scratch/
 .env.example
 CONTRIBUTING.md
-DESIGN.md
-ARCHITECTURE.md
-STRUCTURE.md
-SETUP_COMPLETE.md
-SETUP_DASHBOARD.md
-CHECKPOINT.md
-DX-REVIEW-SUMMARY.md
-SHIP-READINESS.md
-IMPLEMENTATION-CHECKLIST.md
-Idea.md
 CLAUDE.md
 AGENTS.md
 *.bug
 .gstack-checkpoint.txt
-Linux_Env.md
 tsconfig.tsbuildinfo
+examples/

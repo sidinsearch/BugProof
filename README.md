@@ -1,219 +1,245 @@
-# BugProof
+﻿# BugProof
 
 <div align="center">
 
-<img src="assets/icon-512x512.png" width="200" alt="BugProof Logo">
+<img src="assets/icon-512x512.png" width="160" alt="BugProof Logo">
 
 **Executable bugs, not bug reports.**
 
-Capture a backend or CLI failure into a portable `.bug` artifact that another machine can replay.
+Capture a failing command into a portable `.bug` artifact that anyone can replay on their machine — same code, same env, same failure. Cryptographically signable. Cross-platform. Zero containers required.
 
+[![npm version](https://img.shields.io/npm/v/bugproof.svg)](https://www.npmjs.com/package/bugproof)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-blue)]()
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-blue)](https://nodejs.org/)
 [![Cross-Platform](https://img.shields.io/badge/Cross--Platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)]()
+[![Tests](https://img.shields.io/badge/tests-349%20passing-brightgreen)]()
 
 </div>
 
-## What BugProof Captures
+---
 
-A `.bug` artifact includes:
-- Source snapshot (git-tracked files, optional untracked)
-- Command, arguments, and working directory
-- Environment schema (secret values redacted)
-- Stdout/stderr and failure fingerprint
-- Capture metadata (OS, architecture, commit, branch)
+## Why BugProof
 
-This makes replay deterministic and shareable.
+> "Works on my machine" is not a bug report.
 
-## Install (NPM Package)
+Filing a backend or CLI bug today usually looks like this:
+- A screenshot of a terminal
+- A copy-pasted stack trace
+- A list of *probably* relevant files
+- A best-guess description of how the reporter ran the thing
+
+Then the maintainer spends hours reconstructing the failure: matching versions, replicating the env, finding the right command, guessing at config. Most of that time is wasted.
+
+**BugProof captures the bug — not the description of it.** One command produces a single `.bug` file containing the source snapshot, the exact command, the environment schema, the failure fingerprint, and replay metadata. Another developer runs `bugproof replay bug.bug` and reproduces the failure deterministically.
+
+Think of it as **Git for bugs**: a portable, content-addressable, verifiable artifact that turns "can you reproduce?" into a one-liner.
+
+---
+
+## Highlights
+
+- **One-command capture.** Wrap any failing command with `bugproof capture --` and ship the result.
+- **Deterministic replay.** Source, env, command, and fingerprint travel together. Verdict is automatic.
+- **No Docker. No daemon.** Uses native OS primitives — Linux namespaces, Windows Job Objects, macOS Seatbelt.
+- **Cryptographic signatures.** Ed25519 sign/verify built in. Tamper-evident artifacts via `bugproof keygen` / `--sign` / `verify`.
+- **Self-healing replay.** `--self-heal` auto-installs missing npm/pip deps in the sandbox and retries.
+- **Secrets-safe by default.** Env vars matching known secret patterns are redacted at capture time and re-prompted on replay.
+- **Multi-language.** Detects Node.js, Python, Ruby, Go, Rust, Java, C/C++, .NET, Kotlin build context.
+- **Cross-platform.** Win ↔ Linux ↔ macOS replay, with command/env translation and architecture-mismatch guardrails.
+
+---
+
+## Install
 
 ```bash
 npm install -g bugproof
 ```
 
-### Install-time checks (automatic)
+Requirements: **Node.js 18+** and **Git**. Optional language toolchains (Python, Java, Go, Rust, …) only required if your captured command needs them.
 
-During installation, BugProof now automatically:
-- Verifies Node.js version (requires 18+)
-- Checks that Git is available
-- Detects optional language toolchains (python/java/gcc/g++/go/rustc)
-- Attempts `.bug` file association and icon registration (best effort, user scope)
-
-If association setup fails on your system, run manual scripts:
-- Windows: `scripts/bugproof-file-association-windows.reg`
-- Linux: `scripts/bugproof-file-association-linux.sh`
-- macOS: `scripts/bugproof-file-association-macos.sh`
-
-## Requirements
-
-Required:
-- Node.js 18+
-- Git
-
-Optional (only needed if your captured command uses them):
-- Python / Java / GCC / G++ / Go / Rust toolchains
-
-## Quick Start
-
-### 1) Capture a failure
+Run a one-off health check after install:
 
 ```bash
-bugproof capture -- npm test
+bugproof doctor
 ```
 
-### 2) Replay it anywhere
+---
+
+## 60-Second Quick Start
 
 ```bash
-bugproof replay bug_1778049738215.bug
+# 1. Reproduce a failure
+$ npm test
+FAIL  Tests failed because Redis was unreachable.
+
+# 2. Capture it
+$ bugproof capture -- npm test
+  +  Artifact captured!
+  Path        ./bug_1778049738215.bug
+  Files       42 files (28.4 KB)
+  Fingerprint sha256:c8b3...
+
+# 3. Share the file (Slack, email, gist, attachment...)
+
+# 4. Anyone replays it on their machine
+$ bugproof replay bug_1778049738215.bug
+  ✔  REPRODUCTION CONFIRMED
+  Expected exit  1
+  Actual exit    1
+  Verdict        Reproduction confirmed (exact fingerprint match)
 ```
 
-### 3) Inspect artifact contents
+Optional flow:
 
 ```bash
-bugproof inspect bug_1778049738215.bug
+$ bugproof inspect bug.bug      # peek at the contents
+$ bugproof diff old.bug new.bug # what changed between two captures
+$ bugproof share bug.bug        # publish as a GitHub Gist
 ```
 
-### 4) Diff two artifacts
+---
 
-```bash
-bugproof diff old.bug new.bug
-```
+## Commands
 
-## CLI Help (Lists Everything)
+BugProof ships **12 commands**. Every command supports `--help` and `--json` for machine-readable output.
 
-Show full command list and global options:
-
-```bash
-bugproof --help
-```
-
-Show command-specific help:
-
-```bash
-bugproof help capture
-bugproof help replay
-bugproof help inspect
-bugproof help diff
-```
-
-You can also use:
-
-```bash
-bugproof capture --help
-bugproof replay --help
-bugproof inspect --help
-bugproof diff --help
-```
-
-## Commands Reference
+| Command | Purpose |
+|---|---|
+| `bugproof capture` | Run a command, record everything, produce a `.bug` artifact |
+| `bugproof replay` | Re-execute an artifact, compare against expected fingerprint |
+| `bugproof watch` | Transparently wrap a command — capture *only* if it fails |
+| `bugproof inspect` | Show artifact contents (manifest, command, fingerprint, files) |
+| `bugproof diff` | Side-by-side comparison of two artifacts |
+| `bugproof verify` | Validate the Ed25519 signature on a `.bug` (standalone) |
+| `bugproof keygen` | Generate an Ed25519 keypair for signing artifacts |
+| `bugproof share` | Publish an artifact as a GitHub Gist |
+| `bugproof init` | Scaffold a `.bugproofrc` config file |
+| `bugproof prune` | Garbage-collect orphan sandbox temp directories |
+| `bugproof doctor` | Verify OS support for sandbox isolation features |
+| `bugproof help` | Help for any command |
 
 ### `bugproof capture [command...]`
 
-Capture a command execution as a `.bug` artifact.
-
-Examples:
+Run a command end-to-end and bundle the failure as `<name>.bug`.
 
 ```bash
 bugproof capture -- npm test
 bugproof capture -n auth-crash -d "Login fails on expired session" -- node server.js
 bugproof capture --include-untracked -- python app.py
-bugproof capture -x "*.log" -x "*.tmp" -- go test ./...
+bugproof capture -x "*.log" -x "node_modules/**" -- go test ./...
 bugproof capture --timeout 600000 -- java -cp . Main
+bugproof capture --sign --signer "alice@example.com" -- ./run.sh
 bugproof capture --json -- node script.js
 ```
 
-Options:
-- `--include-untracked` Include untracked files (`git ls-files -o`)
-- `--skip-secrets` Skip environment secret scan
-- `--timeout <ms>` Command timeout in milliseconds (default: `300000`)
-- `-n, --name <name>` Human-readable artifact name
-- `-d, --description <desc>` Bug description
-- `-x, --exclude <pattern>` Exclude files matching pattern (repeatable)
-- `--json` Structured JSON output
+Notable options:
+
+| Flag | Description |
+|---|---|
+| `-n, --name <name>` | Artifact name (becomes `<name>.bug`) |
+| `-d, --description <desc>` | Human-readable description embedded in the manifest |
+| `-x, --exclude <pattern>` | Exclude files by glob (repeatable) |
+| `--include-untracked` | Bundle untracked files too (`git ls-files -o`) |
+| `--timeout <ms>` | Kill the command after N ms (default 300000) |
+| `--skip-secrets` | Don't scan env for secrets (skip the confirm prompt) |
+| `--sign [key]` | Sign with the default key, or a named key under `~/.bugproof/keys/`, or a path to a `.key` file |
+| `--signer <id>` | Embed a signer identity (email, gist URL, etc.) |
+| `--json` | Structured JSON output |
 
 ### `bugproof replay <artifact>`
 
-Replay a `.bug` artifact and compare failure signature.
-
-Examples:
+Re-execute the captured artifact and compare results.
 
 ```bash
-bugproof replay my-bug.bug
-bugproof replay --version-match strict my-bug.bug
-bugproof replay --version-match branch my-bug.bug
-bugproof replay --sandbox isolated my-bug.bug
-bugproof replay --env API_URL=https://staging.local --env DEBUG=true my-bug.bug
-bugproof replay --replay-count 5 my-bug.bug
-bugproof replay --json my-bug.bug
+bugproof replay bug.bug
+bugproof replay bug.bug --sandbox isolated
+bugproof replay bug.bug --self-heal
+bugproof replay bug.bug --verify-signature
+bugproof replay bug.bug --replay-count 5         # retry up to 5 times for flaky bugs
+bugproof replay bug.bug --env DEBUG=1 --env PORT=3000
 ```
 
-Options:
-- `--version-match <mode>` `strict | current | branch` (default: `current`)
-- `--sandbox <level>` `workspace | isolated | full` (default: `workspace`)
-- `--env <var=value>` Override environment variable (repeatable)
-- `--replay-count <n>` Run the replay up to N times (useful for flaky bugs/race conditions)
-- `--json` Structured JSON output
+Notable options:
 
-### `bugproof inspect <artifact>`
+| Flag | Description |
+|---|---|
+| `--sandbox <level>` | `workspace` (default), `isolated`, or `full` |
+| `--self-heal` | Auto-install missing npm/pip deps and retry (up to 3 rounds) |
+| `--verify-signature` | Require a valid Ed25519 signature; exit 2 if missing or invalid |
+| `--replay-count <n>` | Retry until reproduction confirmed (for flaky bugs) |
+| `--env KEY=VALUE` | Override environment variables (repeatable) |
+| `--version-match <mode>` | `current`, `strict`, or `branch` git checkout strategy |
+| `--json` | Structured JSON output |
 
-Inspect artifact metadata and failure details without replaying.
+### `bugproof keygen` / `verify` *(cryptographic provenance)*
 
-Examples:
+Sign artifacts with **Ed25519** (RFC 8032). Built on Node's native `crypto` — no external deps.
 
 ```bash
-bugproof inspect my-bug.bug
-bugproof inspect --json my-bug.bug
+# One-time: create your signing key
+bugproof keygen
+# → writes default.pub / default.key to ~/.bugproof/keys/
+
+# Capture with a signature
+bugproof capture --sign --signer "alice@example.com" -- npm test
+
+# Verify a received artifact
+bugproof verify bug.bug
+  ✔  SIGNATURE VALID
+  Algorithm   ed25519
+  Fingerprint 179721ef7e63f6b3
+  Signed at   2026-05-10T22:09:30Z
+  Signer      alice@example.com
+
+# Enforce signatures at replay time
+bugproof replay --verify-signature bug.bug
 ```
 
-Options:
-- `--json` Structured JSON output
+The signature covers a canonical hash of the manifest, the failure fingerprint, and the SHA-256 of every file in the bundle. Tampering with the source snapshot, output, exit code, or metadata invalidates the signature.
 
-### `bugproof diff <left> <right>`
-
-Compare two artifacts side-by-side.
-
-Examples:
-
-```bash
-bugproof diff bug-before.bug bug-after.bug
-bugproof diff --json bug-before.bug bug-after.bug
-```
-
-Options:
-- `--json` Structured JSON output
+> **Note:** identity/PKI is intentionally out of scope. Trust is established by comparing the embedded public-key fingerprint against one you trust (gist pinning, team wiki, key servers, etc.).
 
 ### `bugproof watch [command...]`
 
-Run a command transparently — auto-capture a `.bug` artifact only if it fails. This is the everyday command. Replace `npm test` with `bugproof watch -- npm test` in your workflow.
-
-Examples:
+Transparent wrapper. Runs the command normally; only captures if it fails. Drop-in replacement for any command you'd otherwise hand-run.
 
 ```bash
 bugproof watch -- npm test
-bugproof watch -- python app.py
-bugproof watch -- cargo build
-bugproof watch --always -- node script.js   # capture even on success
-bugproof watch -o ./bugs -- go test ./...   # output to ./bugs/ directory
+bugproof watch -o ./bugs -- python app.py
+bugproof watch --always -- node script.js      # capture even on success
 ```
 
-Options:
-- `--timeout <ms>` Command timeout (default: from `.bugproofrc` or 300000)
-- `-n, --name <name>` Artifact name
-- `-d, --description <desc>` Description
-- `-o, --output <dir>` Output directory
-- `--always` Capture even when command succeeds
-- `--json` Structured JSON output
-
-### `bugproof init`
-
-Create a `.bugproofrc` config file in the current directory.
+### `bugproof inspect <artifact>` / `diff <a> <b>`
 
 ```bash
-bugproof init
-bugproof init --force  # overwrite existing
+bugproof inspect bug.bug                 # manifest, fingerprint, file list, env schema
+bugproof diff captured-v1.bug captured-v2.bug
 ```
 
-Config options (`.bugproofrc`):
+### `bugproof share <artifact>`
+
+Publish an artifact as a GitHub Gist. Respects `HTTPS_PROXY` for corporate networks.
+
+```bash
+bugproof share bug.bug
+bugproof share --public bug.bug
+```
+
+Requires `GITHUB_TOKEN` (or `BUGPROOF_GITHUB_TOKEN`) with `gist` scope.
+
+### `bugproof init` / `prune` / `doctor`
+
+```bash
+bugproof init        # scaffold .bugproofrc
+bugproof prune       # GC orphan sandbox tmpdirs
+bugproof doctor      # check OS support for sandbox isolation
+```
+
+---
+
+## Configuration (`.bugproofrc`)
+
+Generated by `bugproof init`. All fields optional.
 
 ```json
 {
@@ -227,194 +253,193 @@ Config options (`.bugproofrc`):
 }
 ```
 
-Name template variables: `{timestamp}`, `{command}`, `{exit_code}`
+`nameTemplate` variables: `{timestamp}`, `{command}`, `{exit_code}`.
 
-### `bugproof share <artifact>`
-
-Share an artifact via GitHub Gist. Creates a secret gist with manifest, failure info, and a README.
-
-```bash
-bugproof share my-bug.bug
-bugproof share --public my-bug.bug
-```
-
-Requires `GITHUB_TOKEN` or `BUGPROOF_GITHUB_TOKEN` env var with `gist` scope. Automatically respects `HTTP_PROXY` and `HTTPS_PROXY` for corporate environments.
-
-Options:
-- `--public` Create a public gist (default: secret/unlisted)
-- `--json` Structured JSON output
-
-### `bugproof prune`
-
-Clean up orphaned temporary directories and sandbox containers from aborted runs to reclaim disk space.
-
-```bash
-bugproof prune
-```
-
-### `bugproof doctor`
-
-Run a self-diagnostic to verify host OS support for native sandboxing features (Job Objects, Linux namespaces, Apple Seatbelt).
-
-```bash
-bugproof doctor
-```
-
-## Smart Features
-
-### Dependency Detection
-
-When capturing, BugProof automatically detects missing dependencies from error output:
-
-```
-  Missing Dependencies Detected
-    ➜ express (node)
-      npm install express
-```
-
-Supports: Node.js, Python, Ruby, Go, Rust, system libraries.
-
-### Smart Hints on Replay
-
-When a replay produces a different error than expected, BugProof provides actionable hints:
-
-```
-  Hints
-    ➜ Missing Node.js module
-      Install the missing package: npm install express
-    • Network connectivity issue
-      A network connection failed. Check that the required service/host is running.
-```
+---
 
 ## Smart Source Strategy
 
-BugProof intelligently determines how to include source code, keeping artifacts small even for heavy codebases:
+BugProof keeps artifacts small even on heavy codebases:
 
-| Strategy | Condition | What ships | Artifact size |
-|----------|-----------|------------|---------------|
-| `git-full` | Clean git repo | Commit hash only | ~2 KB |
-| `git-patch` | Dirty git repo | Commit hash + diff patch | ~5 KB |
-| `stacktrace` | No git | Only files from error stacktrace | ~10-50 KB |
-| `minimal` | No git, no stacktrace | Command only | ~1 KB |
+| Strategy | When it kicks in | What ships | Typical size |
+|---|---|---|---|
+| `git-full` | Clean git repo | Commit ref only | ~2 KB |
+| `git-patch` | Dirty git repo | Commit ref + diff patch | ~5 KB |
+| `stacktrace` | No git repo | Files mentioned in the error stacktrace | ~10–50 KB |
+| `minimal` | No git, no stacktrace | Command + env only | ~1 KB |
 
-**Git is strongly encouraged but not required.** Without git, BugProof extracts file paths from your error stacktrace and ships only those files — not your entire codebase.
+Git is **strongly encouraged** but not required.
 
-```
-  ➜ Source: Git repo dirty at 5b7c1131. Shipping commit ref + diff patch (0.2 KB).
-```
+---
 
-## BugBox Container
+## Sandbox & Isolation Model
 
-BugProof includes its own lightweight container sandbox — Docker-like isolation without Docker:
-
-```bash
-bugproof replay --container my-bug.bug     # replay with full isolation
-bugproof replay --sandbox full my-bug.bug  # alternative: use sandbox layers
-```
-
-### Isolation layers per platform
+BugProof runs replayed commands in a layered sandbox — Docker-like isolation built on native OS primitives.
 
 | Layer | Linux | Windows | macOS |
-|-------|-------|---------|-------|
-| Process isolation | PID namespace (`unshare --pid`) | Job Objects | sandbox-exec |
-| Network isolation | Network namespace (`unshare --net`) | Firewall rules (`netsh`) | sandbox-exec deny |
-| Filesystem | fuse-overlayfs (read-only source + writable overlay) | Isolated temp | Restricted writes |
+|---|---|---|---|
+| Process | PID namespace (`unshare --pid`) | Job Objects | sandbox-exec |
+| Network | Network namespace (`unshare --net`) | `netsh advfirewall` rules | `(deny network*)` |
+| Filesystem | fuse-overlayfs (RO source + writable overlay) | Isolated temp directory | Restricted write paths |
 | Resource limits | cgroups v2 (memory, CPU, PIDs) | Job Object limits | — |
-| Env sanitization | Strip `LD_PRELOAD`, `NODE_OPTIONS`, etc. | Same | Same |
-| Temp isolation | Private `/tmp` | Private `%TEMP%` | Private `/tmp` |
+| Env sanitization | Strip `LD_PRELOAD`, `NODE_OPTIONS`, … | Same | Same |
+| Temp | Private `/tmp` | Private `%TEMP%` | Private `/tmp` |
 
-Note for Windows: `isolated` and `full` sandbox modes are best-effort hardening, not VM-grade containment. For untrusted artifacts, replay inside a dedicated VM.
+Three sandbox levels are exposed via `--sandbox`:
 
-No Docker daemon, no images, no 400MB overhead. Just native OS primitives.
+- `workspace` *(default)* — minimal isolation, fast. Good for trusted artifacts.
+- `isolated` — namespace + temp isolation. Recommended for untrusted artifacts.
+- `full` — all layers including network deny + resource limits.
+
+> **Caveat:** On Windows, `isolated` and `full` are best-effort hardening, not VM-grade containment. For artifacts from fully untrusted sources, replay inside a dedicated VM.
+
+---
 
 ## Environment Snapshot
 
-BugProof captures runtime versions at capture time and warns on replay when versions differ:
+Capture-time runtime versions are recorded and diffed on replay:
 
 ```
   Environment Mismatches
-    • node version mismatch: captured 18.0.0, current 22.1.0
-    ✘ python 3.11.0 was available at capture but is not installed now.
+    •  node version mismatch: captured 18.0.0, current 22.1.0
+    ✘  python 3.11.0 was available at capture but is not installed now.
 ```
 
-Tracked runtimes: Node.js, Python, Ruby, Go, Rust, Java, npm, pip, OS platform, architecture.
+Tracked: Node.js, Python, Ruby, Go, Rust, Java, npm, pip, OS platform, architecture.
 
-## File Association and Icon Registration
+---
+
+## Cross-Platform Replay
+
+| Capture ↘ / Replay ↗ | Windows | Linux | macOS |
+|---|---|---|---|
+| **Windows** | ✅ | ✅ | ✅ |
+| **Linux** | ✅ | ✅ | ✅ |
+| **macOS** | ✅ | ✅ | ✅ |
+
+Translation layer normalizes commands (`python3 ↔ python`, `gradlew ↔ gradlew.bat`, `make ↔ mingw32-make`, shell paths). Architecture mismatches (`x64 ↔ arm64`) trigger explicit warnings with Rosetta/translation advice.
+
+---
+
+## Security Model
+
+- **Secrets:** env vars matching known secret patterns (`*_TOKEN`, `*_KEY`, `*_SECRET`, AWS/GCP/Stripe shapes, etc.) are redacted at capture time and re-prompted on replay. Use `--skip-secrets` only when you've audited the env yourself.
+- **Path traversal:** every file copy is validated to stay within the artifact and project boundaries.
+- **Script injection:** sandbox commands are spawned with argument arrays, never via shell strings.
+- **Provenance:** Ed25519 signatures cover manifest + fingerprint + per-file SHA-256s. Verification runs locally with no network calls.
+- **Sandbox env sanitization:** `LD_PRELOAD`, `NODE_OPTIONS`, `DYLD_*`, and similar runtime-hijack vectors are stripped before replay.
+- **Cryptography:** Node native `crypto` only (no external crypto deps). No telemetry. No phone-home.
+
+For a full audit checklist see [`docs/security/audit-full.md`](./docs/security/audit-full.md).
+
+---
+
+## File Association
 
 ### Windows
 
-BugProof installer registers `.bug` under:
-- `HKCU\\Software\\Classes\\.bug`
-- `HKCU\\Software\\Classes\\BugProof.Artifact`
-
-with open command pointing to:
-- `node <package>/dist/cli.js replay "%1"`
+Registered under `HKCU\Software\Classes\.bug` → `BugProof.Artifact` with open command `node <package>/dist/cli.js replay "%1"`.
 
 ### Linux
 
-BugProof installer registers:
-- MIME type `application/x-bugproof`
-- `bugproof.desktop` handler
-- User-level icon entry in `~/.local/share/icons/hicolor/...`
+Registers MIME `application/x-bugproof`, a `bugproof.desktop` handler, and a user-level icon entry in `~/.local/share/icons/hicolor/`.
 
 ### macOS
 
-Installer attempts registration via bundled script. If Finder association does not apply, run:
+Best-effort via the bundled script. Re-run manually if Finder association doesn't take:
 
 ```bash
 bash scripts/bugproof-file-association-macos.sh
 ```
 
-## Cross-Platform Replay Matrix
+---
 
-| Capture \ Replay | Windows | Linux | macOS |
-|---|---|---|---|
-| Windows | Yes | Yes | Yes |
-| Linux | Yes | Yes | Yes |
-| macOS | Yes | Yes | Yes |
+## Architecture
 
-Notes:
-- **Cross-Architecture Guardrails**: BugProof actively detects and warns on CPU architecture mismatches (e.g., replaying an `x64` bug on an `arm64` machine), advising on Rosetta/translation impacts.
-- Exit codes may differ by OS for signals/crashes.
-- Fingerprint/error-pattern matching is used for reproduction verdict.
+```
+bugproof/
+├── src/
+│   ├── capture/          # Execution + env snapshot + language detection + packaging
+│   ├── replay/           # Restore + sandbox orchestration + verdict + self-heal
+│   ├── sandbox/          # OS-specific isolation (filesystem, network, process)
+│   ├── share/            # Gist publisher
+│   ├── diff/             # Two-artifact diff engine
+│   ├── utils/            # signing, secrets, fingerprint, dependencies, security, …
+│   └── cli.ts            # Commander entrypoint
+├── tests/                # 38 suites / 349 tests (Jest)
+├── scripts/              # Postinstall, e2e matrix, file-association helpers
+└── .github/workflows/    # CI/CD (tri-platform matrix, signed npm publish)
+```
 
-## Design Principles
+Module map:
 
-- Security-first default behavior (secrets redacted by default)
-- Language-agnostic command capture (works with any CLI tool)
-- Minimal runtime dependencies (Node.js + Git only)
-- Reproducibility over screenshots or log snippets
+| Module | Responsibility |
+|---|---|
+| `capture/engine.ts` | Execute the user's command, record stdout/stderr/exit |
+| `capture/packager.ts` | Bundle into `.bug` zip; optionally sign |
+| `capture/language-support.ts` | Detect Node/Python/Java/Go/Rust/.NET/C++/Kotlin |
+| `replay/engine.ts` | Reproduce the command in a sandbox |
+| `replay/self-heal.ts` | Detect missing deps, install, retry |
+| `replay/verdict.ts` | Compare fingerprint + normalized error patterns |
+| `sandbox/bugbox.ts` | Orchestrate per-OS isolation layers |
+| `utils/signing.ts` | Ed25519 sign / verify / canonical-payload builder |
+| `utils/secrets.ts` | Pattern-based env scanning + redaction |
+| `utils/fingerprint.ts` | Deterministic failure fingerprinting |
+
+---
 
 ## Development
 
 ```bash
+git clone https://github.com/sidinsearch/BugProof.git
+cd BugProof
 npm install
 npm run build
-npm test
+npm test                      # 38 suites, 349 tests
+npm run lint
+npm run test:e2e              # cross-platform matrix (requires SSH config)
 ```
 
-## Architecture
+CI runs on every push to `main` across Ubuntu, Windows, and macOS; on success the pipeline auto-bumps the patch version, publishes to npm (with `--provenance` on public repos), mirrors to GitHub Packages, and creates a GitHub Release. See `.github/workflows/ci.yml`.
 
-BugProof follows a modular pipeline: **Capture → Package → Replay → Verdict**.
+### One-time CI setup
 
-| Module | Purpose |
-|--------|---------|
-| `src/capture/` | Execution capture, environment snapshot, source strategy |
-| `src/replay/` | Artifact restore, sandboxing, verdict generation |
-| `src/replay/verdict.ts` | Fingerprint and normalized-pattern matching |
-| `src/capture/language-support.ts` | Multi-language detection |
+1. Generate an npm automation token at <https://www.npmjs.com/settings/~/tokens>.
+2. Add it as `NPM_TOKEN` under repo Settings → Secrets and variables → Actions.
 
-Tests use Jest and live under `tests/`. Run `npm test` for the full suite. Cross-platform QA uses `scripts/e2e-matrix.js` with SSH-configured Linux hosts.
+---
 
-## CI/CD
+## Roadmap
 
-Every push to `main` triggers automated testing across Ubuntu, Windows, and macOS via GitHub Actions. On success, the pipeline auto-bumps the version, publishes to npm, and creates a GitHub Release. The workflow file is at `.github/workflows/ci.yml`.
+| Status | Item |
+|---|---|
+| ✅ | Multi-language detection (Phase 1.1) |
+| ✅ | Cross-platform sandbox + translation (Phase 1.2) |
+| ✅ | BugBox container-free isolation (Phase 1.3) |
+| ✅ | Smart source strategy + stacktrace mode (Phase 1.4) |
+| ✅ | Corporate proxy support + Gist share (Phase 1.5) |
+| ✅ | **Cryptographic signatures (Phase 2.2)** *— v1.1.0* |
+| ✅ | **Self-healing replay (Phase 3.1)** *— v1.1.0* |
+| ⏳ | Web replay UI (browse `.bug` files in browser) |
+| ⏳ | CI plug-ins (auto-attach `.bug` on failed jobs) |
+| ⏳ | Multi-signature / co-signing workflows |
 
-### One-time setup
+---
 
-1. Generate an npm automation token at https://www.npmjs.com/settings/~/tokens
-2. Add it as `NPM_TOKEN` in GitHub: Settings → Secrets and variables → Actions
+## Contributing
+
+PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines, dev setup, and the test matrix expectations. Every PR runs the full tri-platform CI on green; please add tests for new behavior.
+
+---
 
 ## License
 
-MIT
+[MIT](./LICENSE)
+
+---
+
+<div align="center">
+
+**Bug = Runnable Artifact.**
+
+</div>

@@ -344,16 +344,14 @@ function detectCpp(workingDir: string): DetectionResult | null {
   }
 
   // Detect compiler
-  let compilerVersion: string | null = null;
-  if (os.platform() === 'win32') {
-    compilerVersion = probeVersion('cl', [], /Version\s+([\d.]+)/);
-    if (!compilerVersion) {
-      compilerVersion = probeVersion('gcc', ['--version'], /gcc.*?([\d.]+)/);
+  const compilerVersion: string | null = (() => {
+    if (os.platform() === 'win32') {
+      return probeVersion('cl', [], /Version\s+([\d.]+)/)
+        ?? probeVersion('gcc', ['--version'], /gcc.*?([\d.]+)/);
     }
-  } else {
-    compilerVersion = probeVersion('gcc', ['--version'], /gcc.*?([\d.]+)/)
+    return probeVersion('gcc', ['--version'], /gcc.*?([\d.]+)/)
       ?? probeVersion('clang', ['--version'], /clang.*?([\d.]+)/);
-  }
+  })();
 
   // C/C++ is NOT cross-platform for binaries
   warnings.push('C/C++ produces platform-specific binaries. Source must be recompiled on the target OS.');

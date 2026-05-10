@@ -25,11 +25,11 @@ export function pruneTempDirectories(): { prunedCount: number; prunedBytes: numb
         fs.rmSync(fullPath, { recursive: true, force: true });
         prunedCount++;
         prunedBytes += size;
-      } catch (err) {
+      } catch {
         // Ignore if unable to access/delete
       }
     }
-  } catch (err) {
+  } catch {
     // Ignore tmp dir read errors
   }
 

@@ -124,7 +124,7 @@ export function cleanupIsolatedDir(result: IsolatedDirResult): void {
     try {
       fs.rmSync(result.rootDir, { recursive: true, force: true });
       return; // Success
-    } catch (err) {
+    } catch {
       if (attempt === maxRetries - 1) {
         // Last attempt failed, but don't throw — best effort
         break;

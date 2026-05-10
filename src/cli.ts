@@ -22,6 +22,20 @@ import { shareToGist } from './share/gist.js';
 import { sanitizeShareError } from './share/gist.js';
 import { pruneTempDirectories } from './utils/cleanup.js';
 import { detectMissingDependencies } from './utils/dependencies.js';
+import {
+  SIGNATURE_FILE,
+  buildSignedPayload,
+  generateKeyPair,
+  loadKeyPair,
+  publicKeyFingerprint,
+  resolvePrivateKey,
+  saveKeyPair,
+  verifySignature,
+  KEY_DIR,
+  DEFAULT_KEY_NAME,
+  SignatureRecord,
+} from './utils/signing.js';
+import { selfHealReplay } from './replay/self-heal.js';
 import { determineSourceStrategy } from './capture/source-strategy.js';
 import { captureEnvSnapshot, compareEnvSnapshots, EnvSnapshot } from './capture/env-snapshot.js';
 import { detectProjectLanguages } from './capture/language-support.js';
@@ -71,6 +85,8 @@ program
     return arr;
   }, [] as string[])
   .option('--json', 'Output structured JSON instead of human-readable text')
+  .option('--sign [key]', 'Cryptographically sign the artifact (Ed25519). Optional: named key or path to .key file')
+  .option('--signer <identity>', 'Human-readable signer identity to embed (email, gist URL, etc.)')
   .argument('[command...]', 'The command to run and capture')
   .action(async (commandTokens: string[], options) => {
     const jsonMode = options.json === true;
@@ -227,6 +243,28 @@ program
       info('Packaging artifact...');
     }
 
+    // Resolve signing key if --sign was passed
+    let signingKey;
+    let signerFingerprint: string | undefined;
+    if (options.sign) {
+      try {
+        // --sign passed as flag (string === true via commander when no value), use default key.
+        // --sign <name-or-path> resolves via resolvePrivateKey.
+        signingKey = options.sign === true
+          ? loadKeyPair(DEFAULT_KEY_NAME)
+          : resolvePrivateKey(String(options.sign));
+        signerFingerprint = publicKeyFingerprint(signingKey.publicKey);
+      } catch (err) {
+        if (jsonMode) {
+          console.log(JSON.stringify({ success: false, error: `Signing key error: ${(err as Error).message}` }));
+        } else {
+          error(`Signing key error: ${(err as Error).message}`);
+          info(`Run ${c.cyan('bugproof keygen')} to create a default keypair.`);
+        }
+        process.exit(1);
+      }
+    }
+
     try {
       const packResult = await packageArtifact(artifactPath, {
         manifest,
@@ -242,6 +280,8 @@ program
         sourceStrategy,
         envSnapshot,
         languageContext: langContext,
+        signingKey,
+        signer: options.signer,
       });
 
       if (jsonMode) {
@@ -255,6 +295,9 @@ program
       } else {
         console.log();
         success(c.bold('Artifact captured!'));
+        if (signerFingerprint) {
+          kvLine('Signed', `${c.green(icons.check)} fingerprint ${c.dim(signerFingerprint)}${options.signer ? ` (${options.signer})` : ''}`);
+        }
         console.log();
         kvLine('Path', artifactPath);
         kvLine('Files', `${packResult.filesCount} files (${(packResult.totalSize / 1024).toFixed(1)} KB)`);
@@ -307,6 +350,8 @@ program
   }, [] as string[])
   .option('--json', 'Output structured JSON instead of human-readable text')
   .option('--replay-count <n>', 'Number of times to retry replay for flaky bugs', '1')
+  .option('--self-heal', 'Auto-install missing npm/pip dependencies and retry on failure')
+  .option('--verify-signature', 'Require a valid Ed25519 signature; exit non-zero if missing or invalid')
   .action(async (artifact: string, options) => {
     const jsonMode = options.json === true;
 
@@ -371,6 +416,45 @@ program
         process.exit(1);
       }
 
+    // 2a. Signature verification (Phase 2.2). Always checked when present;
+    // --verify-signature also requires presence.
+    const sigPath = path.join(targetPath, SIGNATURE_FILE);
+    let signatureStatus: 'absent' | 'valid' | 'invalid' = 'absent';
+    let signatureRecord: SignatureRecord | undefined;
+    let signatureReason: string | undefined;
+    if (fs.existsSync(sigPath)) {
+      try {
+        signatureRecord = JSON.parse(fs.readFileSync(sigPath, 'utf-8'));
+        const filesJsonPath = path.join(targetPath, 'files.json');
+        const fileEntries = fs.existsSync(filesJsonPath)
+          ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8'))
+          : [];
+        const { payload } = buildSignedPayload({
+          manifest,
+          failure: expectedFailure,
+          fileEntries,
+        });
+        const verifyRes = verifySignature(signatureRecord!, payload);
+        signatureStatus = verifyRes.valid ? 'valid' : 'invalid';
+        signatureReason = verifyRes.reason;
+      } catch (verifyErr) {
+        signatureStatus = 'invalid';
+        signatureReason = `Failed to parse signature: ${(verifyErr as Error).message}`;
+      }
+    }
+
+    if (options.verifySignature && signatureStatus !== 'valid') {
+      const msg = signatureStatus === 'absent'
+        ? 'No signature.json found in artifact, but --verify-signature was required'
+        : `Signature invalid: ${signatureReason || 'unknown reason'}`;
+      if (jsonMode) {
+        console.log(JSON.stringify({ reproduced: false, signature: signatureStatus, error: msg }));
+      } else {
+        error(msg);
+      }
+      process.exit(2);
+    }
+
     if (!jsonMode) {
       kvLine('Artifact', manifest.name);
       kvLine('Captured', manifest.captured_at);
@@ -378,6 +462,14 @@ program
       kvLine('Platform', `${manifest.captured_on.os}/${manifest.captured_on.arch}`);
       if (manifest.captured_on.git_commit) {
         kvLine('Git', `${manifest.captured_on.git_branch || '?'} @ ${manifest.captured_on.git_commit.slice(0, 8)}`);
+      }
+      if (signatureStatus !== 'absent' && signatureRecord) {
+        const fp = publicKeyFingerprint(signatureRecord.public_key);
+        if (signatureStatus === 'valid') {
+          kvLine('Signature', `${c.green(icons.check)} valid (key ${c.dim(fp)}${signatureRecord.signer ? `, ${signatureRecord.signer}` : ''})`);
+        } else {
+          kvLine('Signature', `${c.red(icons.cross)} ${signatureReason || 'invalid'}`);
+        }
       }
       console.log();
 
@@ -420,35 +512,56 @@ program
     const replayCount = parseInt(options.replayCount, 10) || 1;
     let replayResult: Awaited<ReturnType<typeof replayArtifact>> | undefined;
     let verdict: ReturnType<typeof generateVerdict> | undefined;
+    let selfHealAttempts: Awaited<ReturnType<typeof selfHealReplay>>['attempts'] = [];
 
-    for (let i = 0; i < replayCount; i++) {
-      if (replayCount > 1 && !jsonMode) {
-        info(`Replay attempt ${i + 1}/${replayCount}...`);
+    const replayOpts = {
+      artifactPath: targetPath,
+      versionMatch: options.versionMatch,
+      sandboxLevel: options.sandbox,
+      envOverrides,
+      gitCommit: manifest.captured_on.git_commit,
+      gitBranch: manifest.captured_on.git_branch,
+      capturedPlatform: manifest.captured_on.os,
+      capturedArch: manifest.captured_on.arch,
+    };
+
+    if (options.selfHeal) {
+      if (!jsonMode) {
+        info('Self-heal enabled: will attempt to install missing dependencies on failure.');
       }
-
-      replayResult = await replayArtifact(runConfig, expectedFailure, {
-        artifactPath: targetPath,
-        versionMatch: options.versionMatch,
-        sandboxLevel: options.sandbox,
-        envOverrides,
-        gitCommit: manifest.captured_on.git_commit,
-        gitBranch: manifest.captured_on.git_branch,
-        capturedPlatform: manifest.captured_on.os,
-        capturedArch: manifest.captured_on.arch,
-      });
-
-      verdict = generateVerdict(replayResult);
-
-      if (verdict.status === 'confirmed') {
+      const healResult = await selfHealReplay(runConfig, expectedFailure, replayOpts);
+      replayResult = healResult.finalResult;
+      verdict = generateVerdict(healResult.finalResult);
+      selfHealAttempts = healResult.attempts;
+    } else {
+      for (let i = 0; i < replayCount; i++) {
         if (replayCount > 1 && !jsonMode) {
-          success(`Reproduced successfully on attempt ${i + 1}!`);
+          info(`Replay attempt ${i + 1}/${replayCount}...`);
         }
-        break;
+
+        replayResult = await replayArtifact(runConfig, expectedFailure, replayOpts);
+        verdict = generateVerdict(replayResult);
+
+        if (verdict.status === 'confirmed') {
+          if (replayCount > 1 && !jsonMode) {
+            success(`Reproduced successfully on attempt ${i + 1}!`);
+          }
+          break;
+        }
       }
     }
 
     if (!replayResult || !verdict) {
       throw new Error('Replay engine failed to execute');
+    }
+
+    // Surface self-heal trail
+    if (selfHealAttempts.length > 0 && !jsonMode) {
+      section('Self-Heal Attempts');
+      for (const attempt of selfHealAttempts) {
+        console.log(`    ${c.cyan(icons.arrow)} Round ${attempt.round}: installed [${attempt.installed.join(', ') || 'none'}]${attempt.failedToInstall.length ? ` failed [${attempt.failedToInstall.join(', ')}]` : ''} -> ${attempt.verdictStatus}`);
+      }
+      console.log();
     }
 
     if (jsonMode) {
@@ -1101,6 +1214,153 @@ program
     }
 
     console.log();
+  });
+
+// ─── KEYGEN ─────────────────────────────────────────────────────────────────
+
+program
+  .command('keygen')
+  .description('Generate an Ed25519 keypair for signing .bug artifacts')
+  .option('-n, --name <name>', 'Key name under ~/.bugproof/keys', DEFAULT_KEY_NAME)
+  .option('--force', 'Overwrite existing keys with the same name')
+  .action((options) => {
+    banner(`${icons.arrow} BugProof Keygen`);
+
+    const pubPath = path.join(KEY_DIR, `${options.name}.pub`);
+    const privPath = path.join(KEY_DIR, `${options.name}.key`);
+
+    if (!options.force && (fs.existsSync(pubPath) || fs.existsSync(privPath))) {
+      error(`A key named '${options.name}' already exists at ${KEY_DIR}.`);
+      info('Pass --force to overwrite, or pick a different --name.');
+      process.exit(1);
+    }
+
+    const keyPair = generateKeyPair();
+    const { pubPath: writtenPub, privPath: writtenPriv } = saveKeyPair(options.name, keyPair);
+    const fp = publicKeyFingerprint(keyPair.publicKey);
+
+    success('Generated Ed25519 keypair.');
+    kvLine('Public key', writtenPub);
+    kvLine('Private key', writtenPriv);
+    kvLine('Fingerprint', fp);
+    console.log();
+    info(`Sign captures with: ${c.cyan(`bugproof capture --sign${options.name === DEFAULT_KEY_NAME ? '' : ' ' + options.name} -- <your command>`)}`);
+    info(`Verify artifacts with: ${c.cyan('bugproof verify <artifact>')}`);
+    warn('Keep the .key file private. Anyone with it can sign artifacts as you.');
+    console.log();
+  });
+
+// ─── VERIFY ─────────────────────────────────────────────────────────────────
+
+program
+  .command('verify')
+  .description('Verify the Ed25519 signature embedded in a .bug artifact')
+  .argument('<artifact>', 'Path to the .bug artifact (.bug file or extracted directory)')
+  .option('--json', 'Output structured JSON instead of human-readable text')
+  .action(async (artifact: string, options) => {
+    const jsonMode = options.json === true;
+
+    if (!fs.existsSync(artifact)) {
+      const msg = `Artifact not found: ${artifact}`;
+      if (jsonMode) {
+        console.log(JSON.stringify({ valid: false, error: msg }));
+      } else {
+        error(msg);
+      }
+      process.exit(1);
+    }
+
+    if (!jsonMode) banner(`${icons.arrow} BugProof Verify`);
+
+    const stat = fs.statSync(artifact);
+    let targetPath = artifact;
+    let tempDir: string | undefined;
+
+    try {
+      if (stat.isFile()) {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-verify-'));
+        targetPath = tempDir;
+        await extractZip(artifact, tempDir);
+      }
+
+      const sigPath = path.join(targetPath, SIGNATURE_FILE);
+      if (!fs.existsSync(sigPath)) {
+        const msg = 'No signature.json found — artifact is unsigned.';
+        if (jsonMode) {
+          console.log(JSON.stringify({ valid: false, signed: false, error: msg }));
+        } else {
+          warn(msg);
+          info(`Re-capture with ${c.cyan('--sign')} to produce a signed artifact.`);
+        }
+        process.exit(1);
+      }
+
+      const signature: SignatureRecord = JSON.parse(fs.readFileSync(sigPath, 'utf-8'));
+
+      const manifestRaw = fs.readFileSync(path.join(targetPath, 'manifest.json'), 'utf-8');
+      const failureRaw = fs.readFileSync(path.join(targetPath, 'failure.json'), 'utf-8');
+      const filesJsonPath = path.join(targetPath, 'files.json');
+      const fileEntries = fs.existsSync(filesJsonPath)
+        ? JSON.parse(fs.readFileSync(filesJsonPath, 'utf-8'))
+        : [];
+
+      const manifest = validateArtifactManifest(secureJsonParse(manifestRaw, 'manifest.json'));
+      const failure = validateFailureRecord(secureJsonParse(failureRaw, 'failure.json'));
+      const { payload } = buildSignedPayload({ manifest, failure, fileEntries });
+
+      const result = verifySignature(signature, payload);
+      const fp = publicKeyFingerprint(signature.public_key);
+
+      if (jsonMode) {
+        console.log(JSON.stringify({
+          valid: result.valid,
+          signed: true,
+          fingerprint: fp,
+          signer: signature.signer,
+          signed_at: signature.signed_at,
+          algorithm: signature.algorithm,
+          reason: result.reason,
+        }, null, 2));
+        process.exit(result.valid ? 0 : 2);
+      }
+
+      if (result.valid) {
+        success(c.bold(c.green('SIGNATURE VALID')));
+        console.log();
+        kvLine('Algorithm', signature.algorithm);
+        kvLine('Fingerprint', fp);
+        kvLine('Signed at', signature.signed_at);
+        if (signature.signer) kvLine('Signer', signature.signer);
+        kvLine('Payload hash', c.dim(signature.payload_hash.slice(0, 24) + '...'));
+        console.log();
+        info('Artifact contents have not been modified since signing.');
+        console.log();
+        process.exit(0);
+      } else {
+        error(c.bold(c.red('SIGNATURE INVALID')));
+        console.log();
+        kvLine('Reason', result.reason || 'unknown');
+        kvLine('Fingerprint', fp);
+        if (result.expectedHash && result.actualHash) {
+          kvLine('Expected hash', c.dim(result.expectedHash.slice(0, 24) + '...'));
+          kvLine('Actual hash', c.dim(result.actualHash.slice(0, 24) + '...'));
+        }
+        console.log();
+        process.exit(2);
+      }
+    } catch (err) {
+      const msg = `Verification error: ${(err as Error).message}`;
+      if (jsonMode) {
+        console.log(JSON.stringify({ valid: false, error: msg }));
+      } else {
+        error(msg);
+      }
+      process.exit(1);
+    } finally {
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
   });
 
 program.parse(process.argv);

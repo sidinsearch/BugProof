@@ -71,7 +71,6 @@ export function findConfigFile(startDir: string): string | null {
   let dir = path.resolve(startDir);
   const root = path.parse(dir).root;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const candidate = path.join(dir, CONFIG_FILENAME);
     if (fs.existsSync(candidate)) {

@@ -11,6 +11,12 @@ import { SourceStrategyResult } from './source-strategy.js';
 import { FailureRecord } from '../types/failure.js';
 import { EnvSnapshot } from './env-snapshot.js';
 import { ProjectLanguageContext } from './language-support.js';
+import {
+  KeyPair,
+  SIGNATURE_FILE,
+  buildSignedPayload,
+  signPayload,
+} from '../utils/signing.js';
 
 export interface PackageOptions {
   manifest: ArtifactManifest;
@@ -29,6 +35,10 @@ export interface PackageOptions {
   envSnapshot?: EnvSnapshot;
   /** Detected project languages and build context */
   languageContext?: ProjectLanguageContext;
+  /** If provided, the artifact is signed with this Ed25519 keypair */
+  signingKey?: KeyPair;
+  /** Optional human-readable signer identity attached to the signature */
+  signer?: string;
 }
 
 export interface FileEntry {
@@ -155,7 +165,18 @@ export async function packageArtifact(
       ),
     );
 
-    // 8. Compress the temporary directory into the final .bug zip archive
+    // 9b. Optionally sign the artifact (Phase 2.2: cryptographic provenance)
+    if (options.signingKey) {
+      const { payload } = buildSignedPayload({
+        manifest: manifestWithStats,
+        failure: options.failure,
+        fileEntries,
+      });
+      const signature = signPayload(payload, options.signingKey, options.signer);
+      fs.writeFileSync(path.join(tempDir, SIGNATURE_FILE), JSON.stringify(signature, null, 2));
+    }
+
+    // 10. Compress the temporary directory into the final .bug zip archive
     await zipDirectory(tempDir, artifactPath);
 
     return { filesCount: fileEntries.length, totalSize, fileEntries };
