@@ -418,8 +418,8 @@ program
     }
 
     const replayCount = parseInt(options.replayCount, 10) || 1;
-    let replayResult: any;
-    let verdict: any;
+    let replayResult: Awaited<ReturnType<typeof replayArtifact>> | undefined;
+    let verdict: ReturnType<typeof generateVerdict> | undefined;
 
     for (let i = 0; i < replayCount; i++) {
       if (replayCount > 1 && !jsonMode) {
@@ -445,6 +445,10 @@ program
         }
         break;
       }
+    }
+
+    if (!replayResult || !verdict) {
+      throw new Error('Replay engine failed to execute');
     }
 
     if (jsonMode) {
