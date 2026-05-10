@@ -110,7 +110,9 @@ async function setup() {
 
   // Pack
   log('📦', 'Creating npm tarball...');
-  const tarball = runLocal('npm pack');
+  const packOutput = runLocal('npm pack');
+  const tarball = packOutput.split('\n').map(line => line.trim()).filter(line => line.endsWith('.tgz')).pop();
+  if (!tarball) throw new Error('Failed to find tarball name from npm pack output');
   const tarballPath = path.join(ROOT_DIR, tarball);
   log('✅', `Packed: ${tarball}`);
 
@@ -141,7 +143,7 @@ async function setup() {
   // Install on Linux: extract tarball + install deps + build
   log('🐧', 'Installing BugProof on Linux...');
   const installResult = await runRemote(
-    `cd ${REMOTE_DIR} && tar -xzf ${tarball} --strip-components=1 && npm install --production=false && npm run build`,
+    `cd ${REMOTE_DIR} && tar -xzf ${tarball} --strip-components=1 && npm install --production=false`,
     true
   );
   if (installResult.code !== 0) {
