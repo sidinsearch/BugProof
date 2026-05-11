@@ -409,21 +409,22 @@ PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines, dev setu
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+This project is licensed under the **[GNU Affero General Public License v3.0](LICENSE)** (AGPL-3.0).
 
 | Use Case | Allowed? |
-| --- | --- |
+|---|---|
 | Personal & non-commercial use | ✅ Free, no restrictions |
 | Forking & modifications | ✅ Must release under AGPL-3.0 with source code |
 | Running as a network service (SaaS) | ✅ Must publish your modified source code |
 | Commercial / proprietary use | ❌ Requires a separate commercial license |
 
-Made with ❤️ by [sidinsearch](https://github.com/sidinsearch) · Copyright © 2026 [sidinsearch](https://github.com/sidinsearch) · [AGPL-3.0 License](./LICENSE)
 
 ---
 
-<div align="center">
-
-**Bug = Runnable Artifact.**
-
-</div>
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/sidinsearch">sidinsearch</a>
+  &nbsp;·&nbsp;
+  Copyright &copy; 2026 <a href="https://github.com/sidinsearch">sidinsearch</a>
+  &nbsp;·&nbsp;
+  <a href="LICENSE">AGPL-3.0 License</a>
+</p>
