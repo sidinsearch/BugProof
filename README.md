@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="./assets/icon-512x512.png" width="160" alt="BugProof Logo">
+<img src="https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png" width="160" alt="BugProof Logo">
 
 **Executable bugs, not bug reports.**
 
@@ -401,25 +401,6 @@ bugproof/
 | `share/gist.ts` | GitHub Gist publisher with proxy support |
 
 ---
-
-## Development
-
-```bash
-git clone https://github.com/sidinsearch/BugProof.git
-cd BugProof
-npm install
-npm run build
-npm test                     # 38 suites, 361 tests
-npm run lint
-npm run test:e2e             # cross-platform matrix (requires SSH config)
-```
-
-CI runs on every push to `main` across Ubuntu, Windows, and macOS. On success, the pipeline auto-bumps the patch version, publishes to npm (with `--provenance` on public repos), mirrors to GitHub Packages, and creates a GitHub Release.
-
-### One-time CI setup
-
-1. Generate an npm automation token at <https://www.npmjs.com/settings/~/tokens>.
-2. Add it as `NPM_TOKEN` under repo Settings → Secrets and variables → Actions.
 
 
 
