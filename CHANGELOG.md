@@ -1,9 +1,18 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to BugProof are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.1.3] - 2026-05-11 (License and Packaging Update)
+
+### Changed
+- **License Update**: Switched the open-source license from MIT to **AGPL-3.0**. This strict copyleft stance protects the codebase from proprietary cloud-provider embedding without open-source contributions.
+- **GitHub UI Compatibility**: Implemented a specialized parser bypass mechanism in the `LICENSE` file to ensure the GitHub repository correctly displays the tab name "License" while retaining the full AGPL-3.0 legal text.
+- **NPM Package**: Simplified `.npmignore` to heavily minimize package size (to 156KB). Ensured the BugProof logo works on NPM via relative paths.
 
 ---
 
