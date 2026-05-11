@@ -34,7 +34,7 @@
     "portable"
   ],
   "author": "BugProof Contributors",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@types/archiver": "^7.0.0",

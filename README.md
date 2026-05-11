@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="assets/icon-512x512.png" width="160" alt="BugProof Logo">
+<img src="https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png" width="160" alt="BugProof Logo">
 
 **Executable bugs, not bug reports.**
 
@@ -421,26 +421,7 @@ CI runs on every push to `main` across Ubuntu, Windows, and macOS. On success, t
 1. Generate an npm automation token at <https://www.npmjs.com/settings/~/tokens>.
 2. Add it as `NPM_TOKEN` under repo Settings → Secrets and variables → Actions.
 
----
 
-## Roadmap
-
-| Status | Item |
-|---|---|
-| ✅ | Multi-language detection (Phase 1.1) |
-| ✅ | Cross-platform sandbox + translation (Phase 1.2) |
-| ✅ | BugBox container-free isolation (Phase 1.3) |
-| ✅ | Smart source strategy + stacktrace mode (Phase 1.4) |
-| ✅ | Corporate proxy support + Gist share (Phase 1.5) |
-| ✅ | **Cryptographic signatures — Ed25519 (Phase 2.2)** |
-| ✅ | **Self-healing replay — auto npm/pip install (Phase 3.1)** |
-| ✅ | **Entropy-based secret detection (Phase 2.1)** |
-| ⏳ | Web replay UI (browse `.bug` files in browser) |
-| ⏳ | CI plug-ins (auto-attach `.bug` on failed GitHub Actions jobs) |
-| ⏳ | Multi-signature / co-signing workflows |
-| ⏳ | Offline network mocking (`--mock-network` flag) |
-
----
 
 ## Contributing
 
@@ -450,7 +431,7 @@ PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines, dev setu
 
 ## License
 
-[MIT](./LICENSE) — free and open-source forever.
+[AGPL-3.0](./LICENSE) — strict copyleft for robust end-user freedom.
 
 ---
 
