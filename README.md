@@ -10,7 +10,7 @@ Capture a failing command into a portable `.bug` artifact that anyone can replay
 
 [![npm version](https://img.shields.io/npm/v/bugproof.svg)](https://www.npmjs.com/package/bugproof)
 [![CI](https://github.com/sidinsearch/BugProof/actions/workflows/ci.yml/badge.svg)](https://github.com/sidinsearch/BugProof/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-blue)](https://nodejs.org/)
 [![Cross-Platform](https://img.shields.io/badge/Cross--Platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)]()
 [![Tests](https://img.shields.io/badge/tests-361%20passing-brightgreen)]()
