@@ -47,6 +47,7 @@ docs/
 !.github/workflows/
 .gstack/
 .gstack-worktrees/
+.gstack-context.md
 .opencode/
 .vscode/
 .windsurf/

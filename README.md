@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="./assets/icon-512x512.png" width="160" alt="BugProof Logo">
+<img src="https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png" width="160" alt="BugProof Logo">
 
 **Executable bugs, not bug reports.**
 
@@ -95,6 +95,17 @@ $ bugproof inspect bug.bug        # peek at the contents
 $ bugproof diff old.bug new.bug   # what changed between two captures
 $ bugproof share bug.bug          # publish as a GitHub Gist
 ```
+
+## License
+
+License — strict copyleft for robust end-user freedom.
+
+BugProof is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+You can use, modify, and redistribute it, but if you distribute a modified version
+or run it as a network service, you must provide the corresponding source code
+under the same license.
+
+Read the full license in [LICENSE](./LICENSE).
 
 ---
 
