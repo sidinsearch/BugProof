@@ -207,20 +207,24 @@ function copySourceFiles(
   if (sourceStrategy && sourceStrategy.filesToInclude.length > 0) {
     relativePaths = sourceStrategy.filesToInclude;
   } else {
-    const gitArgs = ['ls-files'];
     if (includeUntracked) {
-      gitArgs.push('-o', '--exclude-standard');
-    }
+      const trackedResult = spawnSync('git', ['ls-files'], { cwd: workingDir, encoding: 'utf-8' });
+      const untrackedResult = spawnSync('git', ['ls-files', '-o', '--exclude-standard'], { cwd: workingDir, encoding: 'utf-8' });
 
-    const result = spawnSync('git', gitArgs, { cwd: workingDir, encoding: 'utf-8' });
-    if (result.status !== 0) {
-      return [];
+      if (trackedResult.status === 0 && untrackedResult.status === 0) {
+        const tracked = trackedResult.stdout.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+        const untracked = untrackedResult.stdout.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+        relativePaths = [...new Set([...tracked, ...untracked])];
+      } else {
+        const fallback = spawnSync('git', ['ls-files'], { cwd: workingDir, encoding: 'utf-8' });
+        if (fallback.status !== 0) return [];
+        relativePaths = fallback.stdout.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+      }
+    } else {
+      const result = spawnSync('git', ['ls-files'], { cwd: workingDir, encoding: 'utf-8' });
+      if (result.status !== 0) return [];
+      relativePaths = result.stdout.split('\n').map(f => f.trim()).filter(f => f.length > 0);
     }
-
-    relativePaths = result.stdout
-      .split('\n')
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0);
   }
 
   // Apply --exclude patterns

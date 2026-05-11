@@ -26,6 +26,7 @@ export function formatCaptureJson(input: CaptureJsonInput): string {
       path: input.artifactPath,
       version: input.manifest.bugproof_version,
       captured_at: input.manifest.captured_at,
+      description: input.manifest.description,
     },
     failure: {
       exit_code: input.failure.exit_code,

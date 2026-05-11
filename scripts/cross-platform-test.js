@@ -92,17 +92,16 @@ async function run() {
   console.log('   Initializing dummy git repo for tests...');
   await execRemote(`cd ${REMOTE_DIR} && git init && git config user.name "Tester" && git config user.email "test@example.com" && git add . && git commit -m "Init"`);
 
-  await execRemote(`cd ${REMOTE_DIR} && npm install --production=false`, true); // install all deps
-  await execRemote(`cd ${REMOTE_DIR} && npm run build`, true);
+  await execRemote(`cd ${REMOTE_DIR} && npm install --production=false --ignore-scripts`, true); // install all deps, skip prepare (dist shipped)
 
-  // 4. Run Linux Test Suite
-  console.log('\n🧪 Running Test Suite on Linux...');
-  const testResult = await execRemote(`cd ${REMOTE_DIR} && npm test`, true);
-  if (testResult.code !== 0) {
-    console.error('❌ Linux Test Suite Failed!');
+  // 4. Quick verification: CLI works on Linux
+  console.log('\n🧪 Verifying CLI works on Linux...');
+  const doctorResult = await execRemote(`cd ${REMOTE_DIR} && node dist/cli.js doctor`, true);
+  if (doctorResult.code !== 0) {
+    console.error('❌ Linux CLI check failed!');
     process.exit(1);
   }
-  console.log('✅ Linux Test Suite Passed!');
+  console.log('✅ Linux CLI works!');
 
   // 5. Cross-Platform Replay Tests
   

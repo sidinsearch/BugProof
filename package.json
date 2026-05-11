@@ -8,7 +8,7 @@
     "bugproof": "dist/cli.js"
   },
   "scripts": {
-    "prepare": "npm run build",
+    "prepare": "node scripts/postinstall.cjs",
     "build": "tsc",
     "postinstall": "node scripts/postinstall.cjs",
     "prepublishOnly": "npm run build && npm run test && npm run lint",
@@ -69,7 +69,8 @@
     "scripts/postinstall.cjs",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "tsconfig.json"
   ],
   "directories": {
     "doc": "docs"
