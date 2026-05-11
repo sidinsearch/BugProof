@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png" width="160" alt="BugProof Logo">
+<img src="./assets/icon-512x512.png" width="160" alt="BugProof Logo">
 
 **Executable bugs, not bug reports.**
 
@@ -431,7 +431,7 @@ PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines, dev setu
 
 ## License
 
-[AGPL-3.0](./LICENSE) — strict copyleft for robust end-user freedom.
+[License](./LICENSE) — strict copyleft for robust end-user freedom.
 
 ---
 
