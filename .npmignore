@@ -1,41 +1,123 @@
-﻿# Ignore development files and build artifacts
-node_modules/
-coverage/
-dist/*.d.ts
-dist/*.map
-.git/
-.github/workflows/
-.env
-.DS_Store
-*.log
-.prettierrc
-.eslintrc
-tsconfig.json
-jest.config.js
+# ====================================================================
+# BugProof .npmignore — controls what lands in the published package
+# Everything NOT in package.json "files" that could leak is listed here.
+# ====================================================================
+
+# Source & build artifacts (dist/ IS included via package.json "files")
+src/
 tests/
+coverage/
+docs/
+
+# Config & tooling (tsconfig.json IS in package.json "files" → do NOT ignore it here)
+jest.config.js
+eslint.config.js
+.eslintrc
+.eslintrc.json
+.prettierrc
+.prettierrc.json
+
+# Dev dependencies & lock files
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Development-only scripts
 scripts/comprehensive-test.js
 scripts/cross-platform-test.js
 scripts/e2e-matrix.js
+scripts/multi-language-matrix.cjs
 scripts/replay-only.js
+scripts/ssh_helper.py
+scripts/ssh_copy_key.py
+scripts/setup_linux_tests.py
 scripts/test-icon-reg.js
-dummy-project/
-docs/
-.vscode/
-.claude/
-.agents/
-.cursor/
-.Codex/
-.opencode/
-.antigravity/
-.gstack/
-.gbrain/
-reports/
-scratch/
-.env.example
-CONTRIBUTING.md
-CLAUDE.md
-AGENTS.md
+scripts/release.cjs
+
+# Bug artifacts & test output
 *.bug
-.gstack-checkpoint.txt
+*.bug/
+*.tgz
+test-results.json
+tests/e2e/results/
+
+# Git & VCS
+.git/
+.gitignore
 tsconfig.tsbuildinfo
+
+# AI & agent tool directories
+.agent/
+.agents/
+.antigravity/
+.claude/
+.claude.json
+.Codex/
+.cursor/
+.gbrain/
+.gemini/
+.gstack/
+.gstack-checkpoint.txt
+.gstack-context.md
+.gstack-worktrees/
+.opencode/
+.vscode/
+.windsurf/
+
+# CI/CD & GitHub
+.github/
+
+# Temporary & scratch
+scratch/
+tmp/
+temp/
+reports/
+dummy-project/
 examples/
+
+# OS generated
+.DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Dev docs (the public README.md and CHANGELOG.md ARE included via "files")
+AGENTS.md
+ARCHITECTURE.md
+CHECKPOINT.md
+CLAUDE.md
+CONTRIBUTING.md
+DESIGN.md
+DX-REVIEW-SUMMARY.md
+Idea.md
+IMPLEMENTATION-CHECKLIST.md
+SECURITY_AUDIT.md
+SECURITY_AUDIT_SUMMARY.md
+SECURITY_FIXES_CHECKLIST.md
+SHIP-READINESS.md
+TROUBLESHOOTING.md
+
+# CI/CD docs
+CI_CD_CROSS_PLATFORM_TESTING_GUIDE.md
+CI_CD_GUIDE.md
+CI_CD_IMPLEMENTATION_SUMMARY.md
+CI_CD_QUICKSTART.md
+CI_CD_SETUP_SUMMARY.js
+DUAL_REGISTRY_SETUP.md
+NPM_PUBLISH.md
+NPM_RELEASE_SETUP.md
+PRODUCTION_READINESS.md
+REGISTRY_SETUP.md
+RELEASE_ASSESSMENT.md
+RELEASE_COMPLETION.md
+RELEASE_READINESS_2026_05_08.md
+RELEASE_STATUS.md
+SECURE_TOKEN_SETUP.md
+FINAL_STATUS_REPORT_2026_05_08.md
+GETTING_STARTED.md
+SETUP_COMPLETE.md
+SETUP_DASHBOARD.md
+TEST_FIXES.md

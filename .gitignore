@@ -1,4 +1,4 @@
-﻿# ====================================================================
+# ====================================================================
 # BugProof Project & Agent Workspace .gitignore
 # ====================================================================
 
@@ -52,14 +52,12 @@ docs/
 .windsurf/
 
 # --------------------------------------------------------------------
-# 4. Auto-generated Product & Agent Docs
+# 4. Auto-generated Product & Agent Docs (NOT CHANGELOG or CONTRIBUTING)
 # --------------------------------------------------------------------
 AGENTS.md
 ARCHITECTURE.md
-CHANGELOG.md
 CHECKPOINT.md
 CLAUDE.md
-CONTRIBUTING.md
 DESIGN.md
 DX-REVIEW-SUMMARY.md
 Idea.md
