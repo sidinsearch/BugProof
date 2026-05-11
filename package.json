@@ -1,6 +1,6 @@
 {
   "name": "bugproof",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Executable bug artifacts — portable, reproducible bug reports",
   "main": "dist/cli.js",
   "type": "module",
