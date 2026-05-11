@@ -95,19 +95,7 @@ $ bugproof inspect bug.bug        # peek at the contents
 $ bugproof diff old.bug new.bug   # what changed between two captures
 $ bugproof share bug.bug          # publish as a GitHub Gist
 ```
-
-## License
-
-License — strict copyleft for robust end-user freedom.
-
-BugProof is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
-You can use, modify, and redistribute it, but if you distribute a modified version
-or run it as a network service, you must provide the corresponding source code
-under the same license.
-
-Read the full license in [LICENSE](./LICENSE).
-
----
+ 
 
 ## Commands
 
@@ -421,7 +409,16 @@ PRs welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for guidelines, dev setu
 
 ## License
 
-[License](./LICENSE) — strict copyleft for robust end-user freedom.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+
+| Use Case | Allowed? |
+| --- | --- |
+| Personal & non-commercial use | ✅ Free, no restrictions |
+| Forking & modifications | ✅ Must release under AGPL-3.0 with source code |
+| Running as a network service (SaaS) | ✅ Must publish your modified source code |
+| Commercial / proprietary use | ❌ Requires a separate commercial license |
+
+Made with ❤️ by [sidinsearch](https://github.com/sidinsearch) · Copyright © 2026 [sidinsearch](https://github.com/sidinsearch) · [AGPL-3.0 License](./LICENSE)
 
 ---
 
