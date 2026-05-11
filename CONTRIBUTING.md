@@ -1,6 +1,6 @@
-﻿# Contributing to BugProof
+# Contributing to BugProof
 
-Thank you for your interest! BugProof is MIT-licensed and welcomes pull requests, bug reports, and feature suggestions.
+Thank you for your interest! BugProof is AGPL-3.0 licensed and welcomes pull requests, bug reports, and feature suggestions.
 
 ---
 
@@ -159,4 +159,4 @@ bugproof capture -- npx bugproof <failing-command>
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
+By contributing, you agree that your contributions will be licensed under the [AGPL-3.0 License](./LICENSE).
