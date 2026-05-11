@@ -8,10 +8,10 @@
     "bugproof": "dist/cli.js"
   },
   "scripts": {
-    "prepare": "node scripts/postinstall.cjs",
+    "prepare": "npm run build && node scripts/postinstall.cjs",
     "build": "tsc",
     "postinstall": "node scripts/postinstall.cjs",
-    "prepublishOnly": "npm run build && npm run test && npm run lint",
+    "prepublishOnly": "npm run test && npm run lint",
     "dev": "tsx watch src/index.ts",
     "test": "npm run build && jest",
     "test:watch": "jest --watch",
