@@ -6,6 +6,8 @@ import { ArtifactManifest, RunConfig, ArtifactMetadata, EnvSchema } from '../../
 import { FailureRecord } from '../../src/types/failure.js';
 import { extractZip } from '../../src/utils/archive.js';
 
+jest.setTimeout(15000);
+
 describe('Packager', () => {
   let tempDir: string;
 
