@@ -10,7 +10,7 @@
  *
  * Tier 2 (No Git):
  *   - full-copy: Ship the entire codebase (excluding heavy dirs like node_modules)
- *               up to a configurable size limit (default 50MB).
+ *               up to a configurable size limit (default 100MB).
  *               If size exceeds the limit → error out, recommend installing git.
  *
  * Why not stacktrace extraction? Because the file that appears in the error

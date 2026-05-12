@@ -614,15 +614,34 @@ program
         }
       }
 
+      // Check if this artifact was captured in stacktrace-only mode (no source files)
+      const sourceStrategyPath = path.join(targetPath, 'source-strategy.json');
+      let isStacktraceOnly = false;
+      if (manifest.files_count === 0 && manifest.files_size_bytes === 0 && fs.existsSync(sourceStrategyPath)) {
+        try {
+          const ss = JSON.parse(fs.readFileSync(sourceStrategyPath, 'utf-8'));
+          isStacktraceOnly = true;
+        } catch { /* ignore parse errors */ }
+      }
+
       // Show smart hints when replay doesn't confirm reproduction
       if (verdict.status !== 'confirmed') {
-        const hints = generateHints(expectedFailure, replayResult.actualFailure, replayResult.actualStderr);
-        if (hints.length > 0) {
-          section('Hints');
-          for (const hint of hints) {
-            const icon = hint.confidence === 'high' ? icons.arrow : icons.dot;
-            console.log(`    ${c.yellow(icon)} ${c.bold(hint.title)}`);
-            console.log(`      ${hint.suggestion}`);
+        if (isStacktraceOnly) {
+          section('Source Files Not Available');
+          console.log(`    ${c.yellow(icons.dot)} ${c.bold('Artifact captured in stacktrace-only mode')}`);
+          console.log(`      The source files exceeded the hardware limit (100MB or 10,000 files)`);
+          console.log(`      at capture time, so they were excluded from the artifact.`);
+          console.log(`      Replay fails because the command's source files are missing.`);
+          console.log(`      To reproduce: checkout the original repo and run the command manually.`);
+        } else {
+          const hints = generateHints(expectedFailure, replayResult.actualFailure, replayResult.actualStderr);
+          if (hints.length > 0) {
+            section('Hints');
+            for (const hint of hints) {
+              const icon = hint.confidence === 'high' ? icons.arrow : icons.dot;
+              console.log(`    ${c.yellow(icon)} ${c.bold(hint.title)}`);
+              console.log(`      ${hint.suggestion}`);
+            }
           }
         }
 

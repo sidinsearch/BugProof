@@ -48,7 +48,7 @@ export interface FileEntry {
 }
 
 const MAX_ARTIFACT_SIZE = 100 * 1024 * 1024; // 100MB hard limit
-const WARN_THRESHOLD    = 50 * 1024 * 1024;  // 50MB warning
+const WARN_THRESHOLD    = 100 * 1024 * 1024;  // 100MB warning
 const MAX_FILE_COUNT    = 10000;            // 10k files hard limit
 
 /**
@@ -252,9 +252,11 @@ function copySourceFiles(
 
     if (runningSize > MAX_ARTIFACT_SIZE || entries.length >= MAX_FILE_COUNT) {
       process.stderr.write(
-        `\n  [WARNING] Repository exceeds hardware limits (50MB or 10,000 files).\n` +
+        `\n  [WARNING] Git-tracked files exceed hardware limits (100MB total or 10,000 files).\n` +
         `  Gracefully falling back to "stacktrace-only" mode. The bug artifact will\n` +
-        `  contain the command, logs, and environment, but NO source files.\n\n`
+        `  contain the command, logs, and environment, but NO source files.\n` +
+        `  The limit counts files that would be packaged (git-tracked + untracked),\n` +
+        `  not the entire working tree.\n\n`
       );
       
       // Clean up partially copied files
