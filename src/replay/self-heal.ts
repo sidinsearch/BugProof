@@ -27,7 +27,7 @@ import { generateVerdict, VerdictStatus } from './verdict.js';
 
 export const MAX_HEAL_ROUNDS = 3;
 
-export interface HealAttempt {
+interface HealAttempt {
   round: number;
   dependencies: MissingDependency[];
   installed: string[];

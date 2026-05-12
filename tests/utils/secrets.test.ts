@@ -151,6 +151,129 @@ describe('Secrets Utility', () => {
     });
   });
 
+  describe('expanded secret patterns', () => {
+    it('should detect GCP API keys', () => {
+      const env = {
+        GCP_API_KEY: 'AIzaSyDsexample1test2key3value4only5',
+        NORMAL_VAR: 'hello'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('GCP_API_KEY');
+      expect(result.detectedKeys).not.toContain('NORMAL_VAR');
+    });
+
+    it('should NOT false-positive on non-GCP-key patterns', () => {
+      const env = { SHORT_KEY: 'AIza' + '1' };
+      // Short, won't match 35-char requirement
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).not.toContain('SHORT_KEY');
+    });
+
+    it('should detect Azure connection strings', () => {
+      const env = {
+        AZURE_STORAGE: 'DefaultEndpointsProtocol=https;AccountName=test;AccountKey=abc123==',
+        SAFE_VAR: 'debug'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('AZURE_STORAGE');
+    });
+
+    it('should detect Azure Key Vault URLs', () => {
+      const env = {
+        KEY_VAULT: 'https://myvault.vault.azure.net/secrets/mysecret',
+        NORMAL_URL: 'https://example.com'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('KEY_VAULT');
+    });
+
+    it('should NOT false-positive on non-Azure vault URLs', () => {
+      const env = {
+        REGULAR_URL: 'https://myvault.otherservice.net/items/xyz'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).not.toContain('REGULAR_URL');
+    });
+
+    it('should detect SSH private key headers', () => {
+      const env = {
+        SSH_KEY: '-----BEGIN OPENSSH PRIVATE KEY-----\nfake',
+        NORMAL_VAR: 'test'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('SSH_KEY');
+    });
+
+    it('should NOT false-positive on public SSH keys', () => {
+      const env = {
+        SSH_PUB: 'ssh-rsa AAAAB3Nz... user@host'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).not.toContain('SSH_PUB');
+    });
+
+    it('should detect JWT tokens', () => {
+      const env = {
+        AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3j6T1N4i8sA',
+        SAFE: 'text'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('AUTH_TOKEN');
+    });
+
+    it('should NOT false-positive on short JWT-like strings', () => {
+      const env = {
+        NOT_JWT: 'eyJ.abc.xyz'  // Too short, value is < 15 chars
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).not.toContain('NOT_JWT');
+    });
+
+    it('should detect GitLab tokens', () => {
+      const env = {
+        GITLAB_TOKEN: 'glpat-abcdef1234567890abcdef12',
+        SAFE: 'info'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('GITLAB_TOKEN');
+    });
+
+    it('should NOT false-positive on short glpat strings', () => {
+      const env = {
+        SHORT: 'glpat-abc'  // Too short, not 20+ chars
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).not.toContain('SHORT');
+    });
+
+    it('should detect Slack tokens', () => {
+      const env = {
+        SLACK_BOT: 'xoxb-123456789012-abcdefghijklmn',
+        SAFE: 'test'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('SLACK_BOT');
+    });
+
+    it('should detect Heroku API keys by key name', () => {
+      const env = {
+        HEROKU_API_KEY: 'abc123-def456-ghi789',
+        NORMAL: 'value'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('HEROKU_API_KEY');
+    });
+
+    it('should detect Docker config auths', () => {
+      const env = {
+        DOCKER_CONFIG: '{"auths": {"registry.example.com": {"auth": "base64=="}}}',
+        SAFE: 'test'
+      };
+      const result = scanEnvironmentForSecrets(env);
+      expect(result.detectedKeys).toContain('DOCKER_CONFIG');
+    });
+  });
+
   describe('scanEnvironmentForSecrets — entropy path', () => {
     it('detects a high-entropy value even with an innocuous key name', () => {
       // Use a key name that matches no known pattern, but value looks like a secret.

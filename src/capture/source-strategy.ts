@@ -23,7 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
 
-export type SourceStrategy = 'git-full' | 'git-patch' | 'git-files' | 'full-copy' | 'exceeded';
+type SourceStrategy = 'git-full' | 'git-patch' | 'git-files' | 'full-copy' | 'exceeded';
 
 export interface SourceStrategyResult {
   strategy: SourceStrategy;

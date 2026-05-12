@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "project": ["src/**", "scripts/**", "tests/**", "!examples/**"],
+  "ignore": [
+    "tests/e2e/fixtures/fs-permission.js",
+    "tests/e2e/fixtures/missing-dep.js",
+    "tests/e2e/fixtures/missing-env.js",
+    "tests/e2e/fixtures/multiline-stderr.js",
+    "tests/e2e/fixtures/syntax-error.js",
+    "tests/e2e/fixtures/timeout-loop.js",
+    "tests/fixtures/multi-lang/node-app/index.js"
+  ],
+  "ignoreDependencies": [],
+  "ignoreBinaries": ["bugproof", "knip"]
+}

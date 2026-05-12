@@ -15,7 +15,7 @@ export interface ArtifactManifest {
   secrets_skipped: string[];
 }
 
-export interface CapturedPlatformContext {
+interface CapturedPlatformContext {
   os: string;
   arch: string;
   node_version: string;

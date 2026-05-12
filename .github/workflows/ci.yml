@@ -146,6 +146,9 @@ jobs:
       - name: Run security audit (production deps only)
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Run dead code detection (knip)
+        run: npx knip --no-progress
+
       # `npm outdated` exits 1 when ANY package is outdated — by design, not a real error.
       # Pipe through `|| true` so the step shows green; this is purely informational.
       - name: Report outdated dependencies (informational)

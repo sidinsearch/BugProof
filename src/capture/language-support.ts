@@ -24,7 +24,7 @@ import * as path from 'path';
 import { spawnSync } from 'child_process';
 import * as os from 'os';
 
-export interface LanguageInfo {
+interface LanguageInfo {
   /** Primary language identifier */
   id: string;
   /** Human-readable name */

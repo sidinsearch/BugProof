@@ -1,4 +1,4 @@
-export const SECRET_PATTERNS = [
+const SECRET_PATTERNS = [
   /api_?key/i,
   /secret/i,
   /token/i,
@@ -7,7 +7,25 @@ export const SECRET_PATTERNS = [
   /aws_secret_access_key/i,
   /github_token/i,
   /stripe_sk_/i,
-  /^[A-Z0-9]{20,128}$/ // Likely tokens (bounded to prevent excessive matching)
+  /^[A-Z0-9]{20,128}$/,
+  // GitLab personal/project access tokens
+  /glpat-[A-Za-z0-9\-_]{20,}/,
+  // GCP API keys (AIza + 35 alphanum/underscore/dash chars)
+  /AIza[A-Z0-9\-_]{35}/,
+  // Azure connection strings
+  /DefaultEndpointsProtocol=/,
+  // Azure Key Vault URLs
+  /https:\/\/[a-zA-Z0-9-]+\.vault\.azure\.net\//,
+  // SSH private key headers
+  /-----BEGIN (?:OPENSSH|RSA|DSA|EC) PRIVATE KEY-----/,
+  // JWT tokens (three dot-separated base64url segments)
+  /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,
+  // Slack tokens (xox[baprs]- prefix)
+  /xox[baprs]-[A-Za-z0-9\-]{10,48}/,
+  // Heroku API key in key name
+  /[hH][eE][rR][oO][kK][uU].*[aA][pP][iI]_?[kK][eE][yY]/,
+  // Docker config auths block
+  /"auths":\s*\{/
 ];
 
 /**

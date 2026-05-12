@@ -9,7 +9,7 @@
 import { spawnSync } from 'child_process';
 import * as os from 'os';
 
-export interface RuntimeVersion {
+interface RuntimeVersion {
   name: string;
   version: string;
   path?: string;

@@ -6,13 +6,13 @@ import { ArtifactManifest } from '../types/artifact.js';
 import { FailureRecord } from '../types/failure.js';
 import { FileEntry } from '../capture/packager.js';
 
-export interface DiffChange {
+interface DiffChange {
   field: string;
   left: unknown;
   right: unknown;
 }
 
-export interface FileChanges {
+interface FileChanges {
   added: string[];
   removed: string[];
   modified: string[];

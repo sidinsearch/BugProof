@@ -74,7 +74,7 @@ export interface ContainerResult {
   description: string;
 }
 
-export interface ContainerLayer {
+interface ContainerLayer {
   name: string;
   applied: boolean;
   reason: string;
