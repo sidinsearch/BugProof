@@ -57,7 +57,6 @@ docs/
 # --------------------------------------------------------------------
 AGENTS.md
 ARCHITECTURE.md
-CHECKPOINT.md
 CLAUDE.md
 DESIGN.md
 DX-REVIEW-SUMMARY.md
@@ -69,7 +68,17 @@ SETUP_DASHBOARD.md
 STRUCTURE.md
 
 # --------------------------------------------------------------------
-# 4b. CI/CD & Release Documentation (auto-generated)
+# 4b. Session & Review Artifacts (auto-generated)
+# --------------------------------------------------------------------
+*_REVIEW_REPORT.md
+*_REVIEW_ANALYSIS.md
+*_REVIEW.md
+*_ENHANCEMENT_SUMMARY.md
+*_PLAN_UPDATE.md
+CHECKPOINT.md
+
+# --------------------------------------------------------------------
+# 4c. CI/CD & Release Documentation (auto-generated)
 # --------------------------------------------------------------------
 CI_CD_CROSS_PLATFORM_TESTING_GUIDE.md
 CI_CD_GUIDE.md
