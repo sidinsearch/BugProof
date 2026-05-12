@@ -28,14 +28,24 @@ const HINT_RULES: PatternRule[] = [
     pattern: /Cannot find module ['"]([^'"]+)['"]/,
     category: 'missing_dependency',
     title: 'Missing Node.js module',
-    suggestion: (m) => `Install the missing package: npm install ${m[1]}`,
+    suggestion: (m) => {
+      const mod = m[1];
+      if (mod.startsWith('.') || mod.startsWith('/') || /^[A-Za-z]:[\\/]/.test(mod)) return `Check that '${mod}' exists in your project.`;
+      if (/\.\w+$/.test(mod)) return `Check that the file '${mod}' exists in your project.`;
+      return `Install the missing package: npm install ${mod.split('/')[0]}`;
+    },
     confidence: 'high',
   },
   {
     pattern: /Error: Cannot find module '([^']+)'/,
     category: 'missing_dependency',
     title: 'Missing Node.js module',
-    suggestion: (m) => `Install the missing package: npm install ${m[1].split('/')[0]}`,
+    suggestion: (m) => {
+      const mod = m[1];
+      if (mod.startsWith('.') || mod.startsWith('/') || /^[A-Za-z]:[\\/]/.test(mod)) return `Check that '${mod}' exists in your project.`;
+      if (/\.\w+$/.test(mod)) return `Check that the file '${mod}' exists in your project.`;
+      return `Install the missing package: npm install ${mod.split('/')[0]}`;
+    },
     confidence: 'high',
   },
   // Python missing module

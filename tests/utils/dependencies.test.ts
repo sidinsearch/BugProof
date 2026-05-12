@@ -75,6 +75,24 @@ describe('Dependency Detection', () => {
     expect(deps.length).toBe(0);
   });
 
+  it('should skip Windows absolute paths (drive letter)', () => {
+    const stderr = "Error: Cannot find module 'C:\\Users\\test\\index.js'";
+    const deps = detectMissingDependencies(stderr);
+    expect(deps.length).toBe(0);
+  });
+
+  it('should skip file paths with extensions', () => {
+    const stderr = "Error: Cannot find module 'index.js'";
+    const deps = detectMissingDependencies(stderr);
+    expect(deps.length).toBe(0);
+  });
+
+  it('should skip ESM package errors on file paths', () => {
+    const stderr = "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'C:\\Users\\test\\index.js' imported from";
+    const deps = detectMissingDependencies(stderr);
+    expect(deps.length).toBe(0);
+  });
+
   it('should detect missing system libraries', () => {
     const stderr = "error while loading shared libraries: libssl.so.1.1: cannot open";
     const deps = detectMissingDependencies(stderr);

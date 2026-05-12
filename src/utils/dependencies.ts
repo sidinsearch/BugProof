@@ -28,6 +28,8 @@ const DETECTION_RULES: DetectionRule[] = [
     extractName: (m) => {
       const mod = m[1];
       if (mod.startsWith('.') || mod.startsWith('/')) return '';
+      if (/^[A-Za-z]:[\\/]/.test(mod)) return '';
+      if (/\.\w+$/.test(mod)) return '';
       // Handle scoped packages: @scope/name
       if (mod.startsWith('@')) {
         const parts = mod.split('/');
@@ -41,7 +43,12 @@ const DETECTION_RULES: DetectionRule[] = [
   {
     pattern: /Error \[ERR_MODULE_NOT_FOUND\]: Cannot find package '([^']+)'/g,
     language: 'node',
-    extractName: (m) => m[1],
+    extractName: (m) => {
+      const mod = m[1];
+      if (/^[A-Za-z]:[\\/]/.test(mod)) return '';
+      if (/\.\w+$/.test(mod)) return '';
+      return mod;
+    },
     installCommand: (name) => `npm install ${name}`,
     confidence: 'high',
   },

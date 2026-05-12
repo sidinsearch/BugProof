@@ -101,4 +101,63 @@ describe('Smart Hints Engine', () => {
     expect(authHint).toBeDefined();
     expect(authHint!.suggestion).toContain('API keys');
   });
+
+  it('should not suggest Windows absolute paths as npm packages', () => {
+    const expected = makeFailure();
+    const actual = makeFailure();
+    const stderr = "Error: Cannot find module 'C:\\Users\\test\\index.js'";
+
+    const hints = generateHints(expected, actual, stderr);
+    const depHint = hints.find(h => h.category === 'missing_dependency');
+    expect(depHint).toBeDefined();
+    expect(depHint!.suggestion).toContain('exists');
+    expect(depHint!.suggestion).not.toContain('npm install');
+  });
+
+  it('should not suggest bare file paths with extensions as npm packages', () => {
+    const expected = makeFailure();
+    const actual = makeFailure();
+    const stderr = "Error: Cannot find module 'index.js'";
+
+    const hints = generateHints(expected, actual, stderr);
+    const depHint = hints.find(h => h.category === 'missing_dependency');
+    expect(depHint).toBeDefined();
+    expect(depHint!.suggestion).not.toContain('install');
+    expect(depHint!.suggestion).toContain('exists');
+  });
+
+  it('should not suggest unix absolute paths as npm packages', () => {
+    const expected = makeFailure();
+    const actual = makeFailure();
+    const stderr = "Error: Cannot find module '/home/user/test/app.js'";
+
+    const hints = generateHints(expected, actual, stderr);
+    const depHint = hints.find(h => h.category === 'missing_dependency');
+    expect(depHint).toBeDefined();
+    expect(depHint!.suggestion).toContain('exists');
+    expect(depHint!.suggestion).not.toContain('npm install');
+  });
+
+  it('should not suggest bare file path (ext stripped) as npm package', () => {
+    const expected = makeFailure();
+    const actual = makeFailure();
+    const stderr = "Error: Cannot find module 'index.js'";
+
+    const hints = generateHints(expected, actual, stderr);
+    const depHint = hints.find(h => h.category === 'missing_dependency');
+    expect(depHint).toBeDefined();
+    expect(depHint!.suggestion).not.toContain('install');
+    expect(depHint!.suggestion).toContain('exists');
+  });
+
+  it('should not suggest unix absolute paths as npm packages', () => {
+    const expected = makeFailure();
+    const actual = makeFailure();
+    const stderr = "Error: Cannot find module '/home/user/test/app.js'";
+
+    const hints = generateHints(expected, actual, stderr);
+    const depHint = hints.find(h => h.category === 'missing_dependency');
+    expect(depHint).toBeDefined();
+    expect(depHint!.suggestion).toContain('exists');
+  });
 });
