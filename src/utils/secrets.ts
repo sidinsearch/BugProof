@@ -21,7 +21,7 @@ const SECRET_PATTERNS = [
   // JWT tokens (three dot-separated base64url segments)
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/,
   // Slack tokens (xox[baprs]- prefix)
-  /xox[baprs]-[A-Za-z0-9\-]{10,48}/,
+  /xox[baprs]-[A-Za-z0-9-]{10,48}/,
   // Heroku API key in key name
   /[hH][eE][rR][oO][kK][uU].*[aA][pP][iI]_?[kK][eE][yY]/,
   // Docker config auths block
