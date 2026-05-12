@@ -619,7 +619,7 @@ program
       let isStacktraceOnly = false;
       if (manifest.files_count === 0 && manifest.files_size_bytes === 0 && fs.existsSync(sourceStrategyPath)) {
         try {
-          const ss = JSON.parse(fs.readFileSync(sourceStrategyPath, 'utf-8'));
+          JSON.parse(fs.readFileSync(sourceStrategyPath, 'utf-8'));
           isStacktraceOnly = true;
         } catch { /* ignore parse errors */ }
       }
