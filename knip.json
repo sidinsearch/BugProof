@@ -8,7 +8,8 @@
     "tests/e2e/fixtures/multiline-stderr.js",
     "tests/e2e/fixtures/syntax-error.js",
     "tests/e2e/fixtures/timeout-loop.js",
-    "tests/fixtures/multi-lang/node-app/index.js"
+    "tests/fixtures/multi-lang/node-app/index.js",
+    "tests/capture/fixtures/spawn-child-and-hang.mjs"
   ],
   "ignoreDependencies": [],
   "ignoreBinaries": ["bugproof", "knip"]

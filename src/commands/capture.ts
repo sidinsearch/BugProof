@@ -8,7 +8,7 @@ import { scanEnvironmentForSecrets, buildEnvironmentSchema } from '../utils/secr
 import { getGitContext } from '../utils/git.js';
 import { formatCaptureJson } from '../utils/json-output.js';
 import { RunConfig, ArtifactManifest, ArtifactMetadata } from '../types/artifact.js';
-import { banner, section, success, warn, error, info, kvLine, c, icons, Spinner } from '../utils/ui.js';
+import { banner, section, success, warn, error, info, kvLine, c, icons } from '../utils/ui.js';
 import { detectMissingDependencies } from '../utils/dependencies.js';
 import {
   loadKeyPair,
