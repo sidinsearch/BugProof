@@ -52,7 +52,7 @@ const WARN_THRESHOLD    = 100 * 1024 * 1024;  // 100MB warning
 const MAX_FILE_COUNT    = 10000;            // 10k files hard limit
 
 /**
- * Packages the artifact into the .bug directory format specified in DESIGN.md.
+ * Packages the artifact into the .bug directory format specified in design-spec.md.
  *
  * Directory layout:
  *   manifest.json

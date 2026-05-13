@@ -148,3 +148,8 @@ scripts/setup_linux_tests.py
 *.dylib
 logs/
 *.log
+# --------------------------------------------------------------------
+# Extended Validation & Testing Artifacts
+# --------------------------------------------------------------------
+production-tests/
+extended-tests/

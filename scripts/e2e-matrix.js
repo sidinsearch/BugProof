@@ -7,7 +7,7 @@
  * Usage: node scripts/e2e-matrix.js
  *
  * Prerequisites:
- *   - Linux test machine reachable via SSH (see Linux_Env.md)
+ *   - Linux test machine reachable via SSH (see linux-env.md)
  *   - npm and Node.js installed on both machines
  */
 

@@ -48,7 +48,8 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
       proc = spawn(command, args, {
         cwd: config.working_directory,
         env: config.environment,
-        shell: false // Prevent shell injection
+        shell: false, // Prevent shell injection
+        detached: process.platform !== 'win32' // Create process group on Linux/macOS
       });
     } catch (err) {
       // Command not found or spawn error
@@ -72,10 +73,40 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
       return;
     }
 
-    // Set timeout
+    const killProcessTree = (signal: 'SIGTERM' | 'SIGKILL') => {
+      if (process.platform === 'win32') {
+        // Windows doesn't support process groups through process.kill
+        // Use taskkill to kill the process tree
+        try {
+          if (signal === 'SIGKILL') {
+            spawn('taskkill', ['/pid', proc.pid!.toString(), '/T', '/F'], { stdio: 'ignore' });
+          } else {
+            spawn('taskkill', ['/pid', proc.pid!.toString(), '/T'], { stdio: 'ignore' });
+          }
+        } catch {
+          try { proc.kill(signal); } catch { /* best effort */ }
+        }
+      } else {
+        // Linux/macOS: kill process group
+        try {
+          process.kill(-proc.pid!, signal);
+        } catch {
+          try { proc.kill(signal); } catch { /* best effort */ }
+        }
+      }
+    };
+
+    // Set timeout with graceful teardown
     const timeoutHandle = setTimeout(() => {
       isTimeout = true;
-      proc.kill('SIGKILL');
+      killProcessTree('SIGTERM');
+      
+      // Wait 1000ms for graceful cleanup, then send SIGKILL
+      setTimeout(() => {
+        if (!resolved) {
+          killProcessTree('SIGKILL');
+        }
+      }, 1000).unref();
     }, config.timeout_ms);
 
     if (config.capture_output) {
