@@ -29,7 +29,7 @@ interface GistResponse {
  *   - https://gist.github.com/abc123
  *   - abc123 (raw ID)
  */
-export function extractGistId(input: string): string {
+function extractGistId(input: string): string {
   // Already a raw ID (32 hex chars)
   if (/^[a-f0-9]{32}$/i.test(input.trim())) {
     return input.trim();
