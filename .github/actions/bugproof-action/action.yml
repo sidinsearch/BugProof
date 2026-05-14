@@ -46,8 +46,9 @@ runs:
       id: cache-bugproof
       uses: actions/cache@v4
       with:
-        path: ~/.nvm/versions/node/*/lib/node_modules/bugproof
-        key: bugproof-${{ runner.os }}-node-${{ inputs.node-version }}-v1
+        # actions/setup-node installs to ~/.npm-global (not nvm) on runners
+        path: ~/.npm-global
+        key: bugproof-${{ runner.os }}-node-${{ inputs.node-version }}-v2
 
     - name: Install bugproof
       if: steps.cache-bugproof.outputs.cache-hit != 'true'
@@ -64,7 +65,6 @@ runs:
         BUGPROOF_TIMEOUT: ${{ inputs.timeout }}
         BUGPROOF_SKIP_SECRETS: ${{ inputs.skip-secrets }}
       run: |
-        set -e
         NAME_ARG=""
         if [ -n "$BUGPROOF_NAME" ]; then
           NAME_ARG="-n $BUGPROOF_NAME"
@@ -74,12 +74,13 @@ runs:
           SECRET_ARG="--skip-secrets"
         fi
 
-        # --json gives us parseable output; capture both stdout and stderr
-        CAPTURE_OUTPUT=$(bugproof capture $NAME_ARG $SECRET_ARG --timeout $BUGPROOF_TIMEOUT --json -- $BUGPROOF_COMMAND 2>&1) || true
+        # --json gives us parseable output; capture stdout and stderr separately
+        CAPTURE_OUTPUT=$(bugproof capture $NAME_ARG $SECRET_ARG --timeout $BUGPROOF_TIMEOUT --json -- $BUGPROOF_COMMAND 2>&1)
+        EXIT_CODE=$?
         echo "$CAPTURE_OUTPUT"
 
-        # Extract artifact path from JSON output
-        ARTIFACT_PATH=$(echo "$CAPTURE_OUTPUT" | grep -oP '"path"\s*:\s*"\K[^"]+' | head -1)
+        # Extract artifact path from JSON output (portable grep - no Perl regex)
+        ARTIFACT_PATH=$(echo "$CAPTURE_OUTPUT" | grep -o '"path"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
         if [ -z "$ARTIFACT_PATH" ]; then
           # Fallback: find the most recent .bug file
           ARTIFACT_PATH=$(find . -maxdepth 2 -name '*.bug' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
@@ -88,7 +89,7 @@ runs:
           ARTIFACT_PATH=$(ls -t *.bug 2>/dev/null | head -1)
         fi
         echo "artifact-path=${ARTIFACT_PATH:-}" >> $GITHUB_OUTPUT
-        echo "exit-code=${PIPESTATUS[0]:-0}" >> $GITHUB_OUTPUT
+        echo "exit-code=${EXIT_CODE}" >> $GITHUB_OUTPUT
 
     # Clean up .bug files from the workspace after upload
     - name: Upload .bug artifact

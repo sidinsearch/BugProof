@@ -149,6 +149,16 @@ function handleRequest(req: JSONRPCRequest): void {
   }
 }
 
+function parseCommandArgs(str: string): string[] {
+  const args: string[] = [];
+  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
+  let match;
+  while ((match = regex.exec(str)) !== null) {
+    args.push(match[1] !== undefined ? match[1] : match[2] !== undefined ? match[2] : match[0]);
+  }
+  return args;
+}
+
 function handleCapture(id: number | string, args: Record<string, unknown>): void {
   const cmdArgs = ['capture', '--json'];
   if (args.name) cmdArgs.push('-n', String(args.name));
@@ -157,7 +167,7 @@ function handleCapture(id: number | string, args: Record<string, unknown>): void
   if (args.description) cmdArgs.push('-d', String(args.description));
 
   const commandStr = String(args.command ?? '');
-  cmdArgs.push('--', ...commandStr.split(/\s+/).filter(Boolean));
+  cmdArgs.push('--', ...parseCommandArgs(commandStr));
 
   const result = runBugproof(cmdArgs);
   sendResult(id, result);
@@ -170,7 +180,6 @@ function handleReplay(id: number | string, args: Record<string, unknown>): void 
     return;
   }
   const cmdArgs = ['replay', artifactPath, '--json'];
-  if (args.workingDir) cmdArgs.push('--workdir', String(args.workingDir));
   sendResult(id, runBugproof(cmdArgs));
 }
 
