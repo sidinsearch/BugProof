@@ -18,6 +18,78 @@ import {
   signPayload,
 } from '../utils/signing.js';
 
+export interface BuildManifestOptions {
+  name: string;
+  description: string;
+  command: string[];
+  workingDirectory: string;
+  exitCode: number;
+  durationMs: number;
+  gitCommit?: string;
+  gitBranch?: string;
+  gitDirty?: boolean;
+  secretsDetected: boolean;
+  secretsSkipped: string[];
+  bugproofVersion: string;
+}
+
+export function buildCaptureManifest(opts: BuildManifestOptions): ArtifactManifest {
+  return {
+    version: '1.0',
+    bugproof_version: opts.bugproofVersion,
+    name: opts.name,
+    description: opts.description,
+    captured_at: new Date().toISOString(),
+    captured_on: {
+      os: os.platform(),
+      arch: os.arch(),
+      node_version: process.version,
+      git_commit: opts.gitCommit,
+      git_branch: opts.gitBranch,
+      git_dirty: opts.gitDirty,
+    },
+    command: opts.command,
+    working_directory: opts.workingDirectory,
+    exit_code: opts.exitCode,
+    duration_ms: opts.durationMs,
+    files_count: 0,
+    files_size_bytes: 0,
+    secrets_detected: opts.secretsDetected,
+    secrets_skipped: opts.secretsSkipped,
+  };
+}
+
+export interface BuildMetadataOptions {
+  bugproofVersion: string;
+  gitRepo?: string;
+  gitCommit?: string;
+  gitBranch?: string;
+  gitDirty?: boolean;
+  gitTags?: string[];
+}
+
+export function buildCaptureMetadata(opts: BuildMetadataOptions): ArtifactMetadata {
+  return {
+    capture_tool_version: opts.bugproofVersion,
+    captured_at: new Date().toISOString(),
+    captured_by: os.userInfo().username,
+    captured_platform: {
+      os: os.platform(),
+      os_version: os.release(),
+      arch: os.arch(),
+      cpu_count: os.cpus().length,
+      memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
+    },
+    project_context: {
+      git_repo: opts.gitRepo,
+      git_commit: opts.gitCommit,
+      git_branch: opts.gitBranch,
+      git_dirty: opts.gitDirty,
+      git_tags: opts.gitTags,
+    },
+  };
+}
+
 export interface PackageOptions {
   manifest: ArtifactManifest;
   envSchema: EnvSchema;

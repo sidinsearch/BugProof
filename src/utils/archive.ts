@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import archiver from 'archiver';
 import extract from 'extract-zip';
 import { isPathWithinBoundary } from './security.js';
@@ -91,4 +92,37 @@ export async function extractZip(zipPath: string, destDir: string): Promise<void
     extractError.cause = error;
     throw extractError;
   }
+}
+
+export interface ExtractedArtifact {
+  targetDir: string;
+  cleanup: () => void;
+}
+
+export async function extractArtifactIfNeeded(artifactPath: string): Promise<ExtractedArtifact> {
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error(`Artifact not found: ${artifactPath}`);
+  }
+
+  const stat = fs.statSync(artifactPath);
+  if (!stat.isFile()) {
+    return { targetDir: artifactPath, cleanup: () => {} };
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-extract-'));
+  try {
+    await extractZip(artifactPath, tempDir);
+  } catch (err) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    const error = err instanceof Error ? err : new Error(String(err));
+    const extractError = new Error(`Failed to extract artifact: ${error.message}`);
+    extractError.cause = error;
+    throw extractError;
+  }
+  return {
+    targetDir: tempDir,
+    cleanup: () => {
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* best effort */ }
+    },
+  };
 }

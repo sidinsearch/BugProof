@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import { shareToGist, sanitizeShareError } from '../share/gist.js';
-import { banner, error, info, kvLine, c, icons, Spinner } from '../utils/ui.js';
+import { banner, info, kvLine, c, icons, Spinner, exitWithError } from '../utils/ui.js';
 
 export const shareCommand = new Command('share')
   .description('Share a .bug artifact via GitHub Gist')
@@ -12,12 +12,7 @@ export const shareCommand = new Command('share')
     const jsonMode = options.json === true;
 
     if (!fs.existsSync(artifact)) {
-      if (jsonMode) {
-        console.log(JSON.stringify({ success: false, error: `Artifact not found: ${artifact}` }));
-      } else {
-        error(`Artifact not found: ${artifact}`);
-      }
-      process.exit(1);
+      exitWithError(`Artifact not found: ${artifact}`, { jsonMode });
     }
 
     let spinner: Spinner | undefined;
@@ -46,11 +41,7 @@ export const shareCommand = new Command('share')
         console.log();
       }
     } catch (err) {
-      if (jsonMode) {
-        console.log(JSON.stringify({ success: false, error: sanitizeShareError(String(err)) }));
-      } else {
-        spinner?.stop(sanitizeShareError(String(err)), true);
-      }
-      process.exit(1);
+      if (!jsonMode) spinner?.stop(sanitizeShareError(String(err)), true);
+      exitWithError(sanitizeShareError(String(err)), { jsonMode });
     }
   });

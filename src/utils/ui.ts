@@ -70,6 +70,16 @@ export function kvLine(key: string, value: string): void {
   console.log('  ' + c.dim(key.padEnd(18)) + ' ' + value);
 }
 
+export function exitWithError(msg: string, opts?: { jsonMode?: boolean; exitCode?: number }): never {
+  const { jsonMode, exitCode = 1 } = opts ?? {};
+  if (jsonMode) {
+    console.log(JSON.stringify({ success: false, error: msg }));
+  } else {
+    error(msg);
+  }
+  process.exit(exitCode);
+}
+
 export function statusBadge(label: string, ok: boolean): void {
   const badge = ok ? c.green('[' + icons.check + ']') : c.red('[' + icons.cross + ']');
   console.log('    ' + badge + ' ' + label);

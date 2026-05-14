@@ -20,9 +20,9 @@ describe('Bug-Box Resource Isolation', () => {
       expect(selectResourceStrategy(caps)).toBe('cgroups');
     });
 
-    it('should select "job-object" on Windows when available', () => {
+    it('should select "none" on Windows (Job Object limits not implemented)', () => {
       const caps = makeCaps({ platform: 'win32', hasJobObjects: true });
-      expect(selectResourceStrategy(caps)).toBe('job-object');
+      expect(selectResourceStrategy(caps)).toBe('none');
     });
 
     it('should select "none" when capabilities are missing', () => {

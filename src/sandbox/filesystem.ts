@@ -57,21 +57,23 @@ export function createIsolatedDir(): IsolatedDirResult {
  * so the replayed process cannot modify captured files.
  *
  * Linux/macOS: removes write bit (chmod a-w recursively).
- * Windows: attrib +r recursively (more reliable than icacls).
+ * Windows: uses icacls to deny write permissions for the current user.
  */
 export function lockDirReadOnly(dirPath: string): void {
   if (!fs.existsSync(dirPath)) return;
 
   if (os.platform() === 'win32') {
-    // On Windows, use attrib +r to set read-only recursively (simpler and more reliable)
+    // On Windows, attrib +r is advisory only (does not prevent writes).
+    // Use icacls to deny write permissions for the current user's group.
     try {
-      spawnSync('attrib', ['+r', dirPath, '/s', '/d'], {
+      const username = os.userInfo().username;
+      spawnSync('icacls', [dirPath, '/deny', `${username}:(W)`, '/T'], {
         encoding: 'utf-8',
         timeout: 10000,
         stdio: 'pipe',
       });
     } catch {
-      // Best effort — attrib may fail on some Windows setups
+      // Best effort — icacls may fail on some Windows setups
     }
   } else {
     // Unix: remove write bit recursively
@@ -87,15 +89,16 @@ export function unlockDir(dirPath: string): void {
   if (!fs.existsSync(dirPath)) return;
 
   if (os.platform() === 'win32') {
-    // On Windows, use attrib -r to clear read-only recursively
+    // On Windows, remove the deny-W entry that lockDirReadOnly added via icacls
     try {
-      spawnSync('attrib', ['-r', dirPath, '/s', '/d'], {
+      const username = os.userInfo().username;
+      spawnSync('icacls', [dirPath, '/remove:d', username], {
         encoding: 'utf-8',
         timeout: 10000,
         stdio: 'pipe',
       });
     } catch {
-      // Best effort — attrib may fail on some Windows setups
+      // Best effort — icacls may fail on some Windows setups
     }
   } else {
     // Unix: restore write bit

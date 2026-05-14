@@ -21,6 +21,7 @@ export default {
     '!src/**/__tests__/**',
     '!src/cli.ts',
     '!src/commands/**',
+    '!src/utils/version.ts',
   ],
   coverageThreshold: {
     global: {

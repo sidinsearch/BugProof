@@ -1,10 +1,9 @@
 import { Command } from 'commander';
-import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { extractZip } from '../utils/archive.js';
+import { extractArtifactIfNeeded, ExtractedArtifact } from '../utils/archive.js';
 import { diffArtifacts, ArtifactSnapshot } from '../diff/engine.js';
-import { banner, section, success, error, info, kvLine, c } from '../utils/ui.js';
+import { banner, section, success, info, kvLine, c, exitWithError } from '../utils/ui.js';
 import {
   secureJsonParse,
   validateArtifactManifest,
@@ -19,37 +18,24 @@ export const diffCommand = new Command('diff')
   .action(async (leftPath: string, rightPath: string, options) => {
     const jsonMode = options.json === true;
 
-    for (const [label, p] of [['Left', leftPath], ['Right', rightPath]] as const) {
-      if (!fs.existsSync(p)) {
-        if (jsonMode) {
-          console.log(JSON.stringify({ error: `${label} artifact not found: ${p}` }));
-        } else {
-          error(`${label} artifact not found at ${p}`);
-        }
-        process.exit(1);
-      }
+    let leftInfo: ExtractedArtifact;
+    let rightInfo: ExtractedArtifact;
+    try {
+      leftInfo = await extractArtifactIfNeeded(leftPath);
+      rightInfo = await extractArtifactIfNeeded(rightPath);
+    } catch (err) {
+      exitWithError(String(err), { jsonMode });
+      return;
     }
 
-    let leftTarget = leftPath;
-    let rightTarget = rightPath;
-    const tempDirs: string[] = [];
+    const leftTarget = leftInfo.targetDir;
+    const rightTarget = rightInfo.targetDir;
+
+    if (!jsonMode && (leftTarget !== leftPath || rightTarget !== rightPath)) {
+      info('Extracting artifacts...');
+    }
 
     try {
-      if (!jsonMode) info('Extracting artifacts...');
-
-      if (fs.statSync(leftPath).isFile()) {
-        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-diff-l-'));
-        tempDirs.push(d);
-        leftTarget = d;
-        await extractZip(leftPath, d);
-      }
-
-      if (fs.statSync(rightPath).isFile()) {
-        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bugproof-diff-r-'));
-        tempDirs.push(d);
-        rightTarget = d;
-        await extractZip(rightPath, d);
-      }
 
     const loadSnapshot = (artifactDir: string): ArtifactSnapshot => {
       const manifest = validateArtifactManifest(
@@ -117,8 +103,7 @@ export const diffCommand = new Command('diff')
     info(`${result.changes.length} property changes, ${(result.fileChanges?.added.length || 0) + (result.fileChanges?.removed.length || 0) + (result.fileChanges?.modified.length || 0)} file changes.`);
     console.log();
     } finally {
-      for (const d of tempDirs) {
-        fs.rmSync(d, { recursive: true, force: true });
-      }
+      leftInfo.cleanup();
+      rightInfo.cleanup();
     }
   });

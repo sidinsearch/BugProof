@@ -1,0 +1,17 @@
+{
+  "exclude": [
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    "*.bug"
+  ],
+  "outputDir": ".",
+  "timeout": 300000,
+  "skipSecrets": false,
+  "includeUntracked": false,
+  "watchOnlyOnFailure": true,
+  "maxArtifactSizeMB": 50,
+  "nameTemplate": "bug_{timestamp}"
+}

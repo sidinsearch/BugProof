@@ -22,8 +22,10 @@ export function selectResourceStrategy(caps: PlatformCapabilities): ResourceStra
     return 'cgroups';
   }
   
+  // Windows: Job Object limits via Start-Process are a no-op
+  // (does not enforce memory limits). Return 'none' to be honest.
   if (caps.platform === 'win32' && caps.hasJobObjects) {
-    return 'job-object';
+    return 'none';
   }
   
   return 'none';

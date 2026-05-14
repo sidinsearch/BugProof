@@ -112,6 +112,51 @@ describe('Capture Engine', () => {
     try { unlinkSync(markerAlive); } catch {}
   }, 15000);
 
+  it('should not double-kill when process exits before timeout', async () => {
+    const result = await executeAndCapture({
+      command: ['node', '-e', 'console.log("fast exit")'],
+      working_directory: process.cwd(),
+      environment: process.env as Record<string, string>,
+      timeout_ms: 5000,
+      capture_output: true,
+    });
+
+    expect(result.failure.exit_code).toBe(0);
+    expect(result.failure.timeout).toBe(false);
+    expect(result.stdout).toContain('fast exit');
+  }, 10000);
+
+  it('should handle very short timeout (100ms)', async () => {
+    const result = await executeAndCapture({
+      command: ['node', '-e', 'setTimeout(() => {}, 60000)'],
+      working_directory: process.cwd(),
+      environment: process.env as Record<string, string>,
+      timeout_ms: 100,
+      capture_output: true,
+    });
+
+    expect(result.failure.timeout).toBe(true);
+    expect(result.failure.exit_code).toBe(1);
+  }, 10000);
+
+  it('should capture partial output on timeout', async () => {
+    const result = await executeAndCapture({
+      command: [
+        'node',
+        '-e',
+        'console.log("before"); setInterval(() => console.log("tick"), 50000)',
+      ],
+      working_directory: process.cwd(),
+      environment: process.env as Record<string, string>,
+      timeout_ms: 500,
+      capture_output: true,
+    });
+
+    expect(result.failure.timeout).toBe(true);
+    // stdout before the timeout should be captured
+    expect(result.stdout).toContain('before');
+  }, 10000);
+
   it('should handle a command that does not exist', async () => {
     const result = await executeAndCapture({
       command: ['nonexistent_binary_xyz_123'],

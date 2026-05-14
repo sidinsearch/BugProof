@@ -1,13 +1,12 @@
 import { Command } from 'commander';
-import * as os from 'os';
-import * as fs from 'fs';
 import * as path from 'path';
 import { executeAndCapture } from '../capture/engine.js';
-import { packageArtifact } from '../capture/packager.js';
+import { packageArtifact, buildCaptureManifest, buildCaptureMetadata } from '../capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from '../utils/secrets.js';
 import { getGitContext } from '../utils/git.js';
+import { getBugProofVersion } from '../utils/version.js';
 import { formatCaptureJson } from '../utils/json-output.js';
-import { RunConfig, ArtifactManifest, ArtifactMetadata } from '../types/artifact.js';
+import { RunConfig } from '../types/artifact.js';
 import { banner, section, success, warn, error, info, kvLine, c, icons } from '../utils/ui.js';
 import { detectMissingDependencies } from '../utils/dependencies.js';
 import {
@@ -20,7 +19,7 @@ import { determineSourceStrategy } from '../capture/source-strategy.js';
 import { captureEnvSnapshot } from '../capture/env-snapshot.js';
 import { detectProjectLanguages } from '../capture/language-support.js';
 
-const VERSION = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')).version;
+const VERSION = getBugProofVersion();
 
 export const captureCommand = new Command('capture')
   .description('Capture a failing command as a .bug artifact')
@@ -112,56 +111,36 @@ export const captureCommand = new Command('capture')
       }
     }
 
-    // 4. Build manifest
+    // 4. Build manifest and metadata
     const envSchema = buildEnvironmentSchema(process.env, secrets.detectedKeys);
 
     const artifactName = options.name
       ? options.name.replace(/[^a-zA-Z0-9_-]/g, '_')
       : `bug_${Date.now()}`;
 
-    const manifest: ArtifactManifest = {
-      version: '1.0',
-      bugproof_version: VERSION,
+    const manifest = buildCaptureManifest({
       name: artifactName,
       description: options.description || `Captured failure: ${commandTokens.join(' ')}`,
-      captured_at: new Date().toISOString(),
-      captured_on: {
-        os: os.platform(),
-        arch: os.arch(),
-        node_version: process.version,
-        git_commit: git.commit,
-        git_branch: git.branch,
-        git_dirty: git.dirty,
-      },
       command: commandTokens,
-      working_directory: runConfig.working_directory,
-      exit_code: result.failure.exit_code,
-      duration_ms: result.failure.duration_ms,
-      files_count: 0,
-      files_size_bytes: 0,
-      secrets_detected: secrets.hasSecrets,
-      secrets_skipped: secrets.detectedKeys,
-    };
+      workingDirectory: runConfig.working_directory,
+      exitCode: result.failure.exit_code,
+      durationMs: result.failure.duration_ms,
+      gitCommit: git.commit,
+      gitBranch: git.branch,
+      gitDirty: git.dirty,
+      secretsDetected: secrets.hasSecrets,
+      secretsSkipped: secrets.detectedKeys,
+      bugproofVersion: VERSION,
+    });
 
-    const metadata: ArtifactMetadata = {
-      capture_tool_version: VERSION,
-      captured_at: new Date().toISOString(),
-      captured_by: os.userInfo().username,
-      captured_platform: {
-        os: os.platform(),
-        os_version: os.release(),
-        arch: os.arch(),
-        cpu_count: os.cpus().length,
-        memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
-      },
-      project_context: {
-        git_repo: git.repo,
-        git_commit: git.commit,
-        git_branch: git.branch,
-        git_dirty: git.dirty,
-        git_tags: git.tags,
-      },
-    };
+    const metadata = buildCaptureMetadata({
+      bugproofVersion: VERSION,
+      gitRepo: git.repo,
+      gitCommit: git.commit,
+      gitBranch: git.branch,
+      gitDirty: git.dirty,
+      gitTags: git.tags,
+    });
 
     // 5. Determine source strategy
     const sourceStrategy = determineSourceStrategy({

@@ -5,9 +5,25 @@ import { banner, section, warn, kvLine, icons, statusBadge } from '../utils/ui.j
 
 export const doctorCommand = new Command('doctor')
   .description('Verify host OS support for sandboxing and features')
-  .action(() => {
-    banner(`${icons.arrow} BugProof Doctor`);
+  .option('--json', 'Output structured JSON instead of human-readable text')
+  .action((options) => {
+    const jsonMode = options.json === true;
     const caps = detectCapabilities();
+
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        host: {
+          os: `${os.type()} ${os.release()}`,
+          platform: caps.platform,
+          architecture: os.arch(),
+          node_version: process.version,
+        },
+        capabilities: caps,
+      }, null, 2));
+      return;
+    }
+
+    banner(`${icons.arrow} BugProof Doctor`);
 
     section('Host Information');
     kvLine('OS', `${os.type()} ${os.release()}`);

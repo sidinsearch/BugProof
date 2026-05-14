@@ -268,4 +268,36 @@ describe('CLI end-to-end', () => {
       fs.rmSync(noGitDir, { recursive: true, force: true });
     }
   }, 15000);
+
+  // Phase 1: CLI Modularization — all 11 commands registered
+  it('should list all 11 commands in help output', () => {
+    const r = run('--help', process.cwd());
+    expect(r.status).toBe(0);
+    for (const cmd of ['capture', 'replay', 'inspect', 'diff', 'watch',
+      'init', 'share', 'prune', 'doctor', 'keygen', 'verify']) {
+      expect(r.stdout).toContain(cmd);
+    }
+  });
+
+  it('each command should show --help without error', () => {
+    for (const cmd of ['capture', 'replay', 'inspect', 'diff', 'watch',
+      'init', 'share', 'prune', 'doctor', 'keygen', 'verify']) {
+      const r = run(`${cmd} --help`, process.cwd());
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain(cmd);
+    }
+  });
+
+  it('inspect should list manifest fields for a valid artifact', () => {
+    const r = run('capture --skip-secrets --json -- node -e "throw new Error(\'inspect-test\')"', projectDir);
+    expect(r.status).toBe(0);
+    // Find the .bug file
+    const bugFiles = fs.readdirSync(projectDir).filter(f => f.endsWith('.bug'));
+    expect(bugFiles.length).toBeGreaterThan(0);
+    const artifact = path.join(projectDir, bugFiles[0]);
+    const ir = run(`inspect ${artifact}`, projectDir);
+    expect(ir.status).toBe(0);
+    expect(ir.stdout).toContain('Manifest');
+    expect(ir.stdout).toContain('bugproof');
+  }, 15000);
 });

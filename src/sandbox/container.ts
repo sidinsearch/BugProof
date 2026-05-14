@@ -37,6 +37,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { spawnSync } from 'child_process';
 import { detectCapabilities, PlatformCapabilities } from './capabilities.js';
+import { addFirewallBlockRule } from './network.js';
 
 export interface ContainerConfig {
   /** The command to run inside the container */
@@ -288,39 +289,21 @@ function applyWindowsIsolation(
 ): { command: string[]; layers: ContainerLayer[]; cleanupFns: (() => void)[] } {
   const layers: ContainerLayer[] = [];
   const cleanupFns: (() => void)[] = [];
-  let cmd = [...command];
+  const cmd = [...command];
 
   // Job Object wrapper for process group + resource limits
-  if (caps.hasJobObjects && config.limits) {
-    const { maxMemoryMB } = config.limits;
-    if (maxMemoryMB) {
-      // Use a PowerShell wrapper that creates a Job Object
-      const exe = cmd[0];
-      const args = cmd.slice(1).map(a => `"${a.replace(/"/g, '`"')}"`).join(',');
-      const psScript = [
-        '$ErrorActionPreference = "Stop"',
-        args
-          ? `$p = Start-Process -NoNewWindow -Wait -PassThru -FilePath "${exe}" -ArgumentList ${args}`
-          : `$p = Start-Process -NoNewWindow -Wait -PassThru -FilePath "${exe}"`,
-        'exit $p.ExitCode',
-      ].join('; ');
-
-      cmd = ['powershell', '-NoProfile', '-Command', psScript];
-      layers.push({ name: 'job-object', applied: true, reason: `Process group isolation, mem limit ${maxMemoryMB}MB` });
-    }
+  // NOTE: Start-Process does NOT enforce memory limits. A proper implementation
+  // would require a C# helper compiled at runtime (not yet implemented).
+  if (caps.hasJobObjects && config.limits && config.limits.maxMemoryMB) {
+    layers.push({ name: 'job-object', applied: false, reason: 'Windows Job Object memory limits require C# interop (not yet implemented)' });
   }
 
-  // Network isolation via firewall
+  // Network isolation via firewall (shared helper from network.ts sanitizes the path)
   if (config.network === 'none' && caps.hasNetsh) {
     const ruleName = `bugbox-${Date.now()}`;
     const exePath = command[0];
 
-    const addResult = spawnSync('netsh', [
-      'advfirewall', 'firewall', 'add', 'rule',
-      `name=${ruleName}`, 'dir=out', 'action=block', `program=${exePath}`,
-    ], { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' });
-
-    if (addResult.status === 0) {
+    if (addFirewallBlockRule(ruleName, exePath)) {
       layers.push({ name: 'network-firewall', applied: true, reason: 'Outbound traffic blocked via netsh' });
       cleanupFns.push(() => {
         spawnSync('netsh', [
@@ -328,7 +311,7 @@ function applyWindowsIsolation(
         ], { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' });
       });
     } else {
-      layers.push({ name: 'network-firewall', applied: false, reason: 'netsh rule creation failed (may need admin)' });
+      layers.push({ name: 'network-firewall', applied: false, reason: 'netsh rule creation failed (may need admin or malicious path rejected)' });
     }
   }
 
@@ -389,6 +372,9 @@ const DANGEROUS_ENV_VARS = [
   'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS',
   'CLASSPATH',
   'SUDO_ASKPASS', 'SSH_AUTH_SOCK',
+  'BASH_ENV', 'ENV', 'PROMPT_COMMAND', 'IFS',
+  'SHELLOPTS', 'BASHOPTS',
+  'LD_AUDIT', 'LD_DEBUG',
 ];
 
 function sanitizeContainerEnv(env: Record<string, string>): Record<string, string> {
@@ -436,6 +422,8 @@ function copyDirShallow(src: string, dest: string, maxDepth = 3, currentDepth = 
         // Skip files > 1MB in shallow copy
         if (stat.size <= 1 * 1024 * 1024) {
           fs.copyFileSync(srcPath, destPath);
+        } else {
+          process.stderr.write(`  [bugbox] Skipping large file in workspace overlay: ${entry.name} (${(stat.size / 1024 / 1024).toFixed(1)} MB)\n`);
         }
       } catch {
         // Ignore copy errors for large files or permission issues

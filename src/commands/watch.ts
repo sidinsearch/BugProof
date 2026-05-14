@@ -1,16 +1,16 @@
 import { Command } from 'commander';
-import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { executeAndCapture } from '../capture/engine.js';
-import { packageArtifact } from '../capture/packager.js';
+import { packageArtifact, buildCaptureManifest, buildCaptureMetadata } from '../capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from '../utils/secrets.js';
 import { getGitContext } from '../utils/git.js';
+import { getBugProofVersion } from '../utils/version.js';
 import { loadConfig, applyNameTemplate } from '../config/loader.js';
-import { RunConfig, ArtifactManifest, ArtifactMetadata } from '../types/artifact.js';
+import { RunConfig } from '../types/artifact.js';
 import { success, error, info, kvLine, c, Spinner } from '../utils/ui.js';
 
-const VERSION = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')).version;
+const VERSION = getBugProofVersion();
 
 export const watchCommand = new Command('watch')
   .description('Run a command and auto-capture a .bug artifact if it fails')
@@ -79,49 +79,29 @@ export const watchCommand = new Command('watch')
           exit_code: result.failure.exit_code,
         });
 
-    const manifest: ArtifactManifest = {
-      version: '1.0',
-      bugproof_version: VERSION,
+    const manifest = buildCaptureManifest({
       name: artifactName,
       description: options.description || `Auto-captured failure: ${commandTokens.join(' ')}`,
-      captured_at: new Date().toISOString(),
-      captured_on: {
-        os: os.platform(),
-        arch: os.arch(),
-        node_version: process.version,
-        git_commit: git.commit,
-        git_branch: git.branch,
-        git_dirty: git.dirty,
-      },
       command: commandTokens,
-      working_directory: runConfig.working_directory,
-      exit_code: result.failure.exit_code,
-      duration_ms: result.failure.duration_ms,
-      files_count: 0,
-      files_size_bytes: 0,
-      secrets_detected: secrets.hasSecrets,
-      secrets_skipped: secrets.detectedKeys,
-    };
+      workingDirectory: runConfig.working_directory,
+      exitCode: result.failure.exit_code,
+      durationMs: result.failure.duration_ms,
+      gitCommit: git.commit,
+      gitBranch: git.branch,
+      gitDirty: git.dirty,
+      secretsDetected: secrets.hasSecrets,
+      secretsSkipped: secrets.detectedKeys,
+      bugproofVersion: VERSION,
+    });
 
-    const metadata: ArtifactMetadata = {
-      capture_tool_version: VERSION,
-      captured_at: new Date().toISOString(),
-      captured_by: os.userInfo().username,
-      captured_platform: {
-        os: os.platform(),
-        os_version: os.release(),
-        arch: os.arch(),
-        cpu_count: os.cpus().length,
-        memory_gb: Math.round(os.totalmem() / 1024 / 1024 / 1024),
-      },
-      project_context: {
-        git_repo: git.repo,
-        git_commit: git.commit,
-        git_branch: git.branch,
-        git_dirty: git.dirty,
-        git_tags: git.tags,
-      },
-    };
+    const metadata = buildCaptureMetadata({
+      bugproofVersion: VERSION,
+      gitRepo: git.repo,
+      gitCommit: git.commit,
+      gitBranch: git.branch,
+      gitDirty: git.dirty,
+      gitTags: git.tags,
+    });
 
     const artifactDir = path.resolve(outputDir);
     if (!fs.existsSync(artifactDir)) {
