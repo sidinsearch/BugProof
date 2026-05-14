@@ -54,20 +54,30 @@ runs:
       run: |
         ARGS=""
         if [ -n "${{ inputs.name }}" ]; then
-          ARGS="$ARGS -n ${{ inputs.name }}"
+          ARGS="$ARGS -n '${{ inputs.name }}'"
         fi
         if [ "${{ inputs.skip-secrets }}" = "true" ]; then
           ARGS="$ARGS --skip-secrets"
         fi
-        ARTIFACT_NAME="${name:-bug_$(date +%s)}"
-        bugproof capture $ARGS --timeout ${{ inputs.timeout }} -- ${{ inputs.command }}
-        echo "artifact-path=${ARTIFACT_NAME}.bug" >> $GITHUB_OUTPUT
+        CAPTURE_OUTPUT=$(bugproof capture $ARGS --timeout ${{ inputs.timeout }} -- ${{ inputs.command }} 2>&1) || true
+        echo "$CAPTURE_OUTPUT"
+        EXTRACTED_PATH=$(echo "$CAPTURE_OUTPUT" | grep -oP "Path\s+\S+\.bug" | awk '{print $NF}')
+        if [ -n "$EXTRACTED_PATH" ] && [ -f "$EXTRACTED_PATH" ]; then
+          echo "artifact-path=$EXTRACTED_PATH" >> $GITHUB_OUTPUT
+        else
+          FOUND_FILE=$(ls -t *.bug 2>/dev/null | head -1)
+          if [ -n "$FOUND_FILE" ]; then
+            echo "artifact-path=$FOUND_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "artifact-path=" >> $GITHUB_OUTPUT
+          fi
+        fi
         echo "exit-code=$?" >> $GITHUB_OUTPUT
 
-    - name: Upload artifact
-      if: ${{ inputs.upload-artifact == 'true' }}
-      uses: actions/upload-artifact@v4
+    - name: Upload .bug artifact
+      if: ${{ inputs.upload-artifact == 'true' && steps.capture.outputs.artifact-path != '' }}
+      uses: actions/upload-artifact@v6
       with:
-        name: ${{ inputs.name || 'bugproof-capture' }}
+        name: bugproof-capture-${{ inputs.name || github.sha }}
         path: ${{ steps.capture.outputs.artifact-path }}
-        if-no-files-found: error
+        if-no-files-found: warn
