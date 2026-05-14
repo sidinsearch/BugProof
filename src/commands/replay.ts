@@ -262,7 +262,12 @@ export const replayCommand = new Command('replay')
         }));
       } else {
         if ((options.sandbox === 'isolated' || options.sandbox === 'full') && replayResult.bugBox?.platform === 'win32') {
-          warn('Windows sandbox isolation is best-effort. Use a VM for untrusted artifacts.');
+          warn('Windows sandbox isolation is best-effort only:');
+          console.log(`    ${c.yellow(icons.dot)} No process namespace — replayed process can see host processes`);
+          console.log(`    ${c.yellow(icons.dot)} No memory limits — Job Objects do not enforce RAM caps on Windows`);
+          console.log(`    ${c.yellow(icons.dot)} Network firewall is process-specific, not system-wide`);
+          console.log(`    ${c.yellow(icons.dot)} For untrusted artifacts, use a VM or container.`);
+          console.log();
         }
 
         // Show cross-platform warnings/translations before verdict

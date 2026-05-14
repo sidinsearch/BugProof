@@ -48,7 +48,6 @@ const TOOLS = [
       type: 'object',
       properties: {
         artifact: { type: 'string', description: 'Path to the .bug file to replay' },
-        workingDir: { type: 'string', description: 'Working directory for replay (optional)' },
       },
       required: ['artifact'],
     },

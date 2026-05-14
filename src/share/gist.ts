@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import * as https from 'https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { extractZip } from '../utils/archive.js';
@@ -20,6 +21,81 @@ export interface ShareResult {
 
 interface GistFile {
   content: string;
+}
+
+interface ShareCacheEntry {
+  url: string;
+  gistId: string;
+  fingerprint: string;
+  sharedAt: string;
+}
+
+const SHARE_CACHE_DIR = path.join(os.homedir(), '.bugproof', 'share-cache');
+const SHARE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Checks if an identical artifact was shared recently.
+ * Returns the cached URL if found within TTL, null otherwise.
+ */
+function findCachedShare(fingerprint: string): ShareCacheEntry | null {
+  const cacheFile = path.join(SHARE_CACHE_DIR, 'cache.json');
+  if (!fs.existsSync(cacheFile)) return null;
+
+  try {
+    const cache: ShareCacheEntry[] = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    const entry = cache.find(e => e.fingerprint === fingerprint);
+    if (entry && Date.now() - new Date(entry.sharedAt).getTime() < SHARE_CACHE_TTL_MS) {
+      return entry;
+    }
+    // Clean up expired entries
+    const valid = cache.filter(e => Date.now() - new Date(e.sharedAt).getTime() < SHARE_CACHE_TTL_MS);
+    if (valid.length !== cache.length) {
+      fs.writeFileSync(cacheFile, JSON.stringify(valid, null, 2));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Caches a share result for dedup.
+ */
+function cacheShare(fingerprint: string, result: ShareResult): void {
+  try {
+    fs.mkdirSync(SHARE_CACHE_DIR, { recursive: true });
+    const cacheFile = path.join(SHARE_CACHE_DIR, 'cache.json');
+    let cache: ShareCacheEntry[] = [];
+    if (fs.existsSync(cacheFile)) {
+      cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    }
+    // Remove any existing entry for this fingerprint
+    cache = cache.filter(e => e.fingerprint !== fingerprint);
+    cache.push({
+      url: result.url,
+      gistId: result.gistId,
+      fingerprint,
+      sharedAt: new Date().toISOString(),
+    });
+    fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 2));
+  } catch {
+    // Best effort — cache failures should not block sharing
+  }
+}
+
+/**
+ * Computes a fingerprint for the artifact's key files.
+ */
+function computeArtifactFingerprint(targetDir: string): string {
+  const hash = crypto.createHash('sha256');
+  const keyFiles = ['manifest.json', 'failure.json', 'run.json'];
+  for (const filename of keyFiles) {
+    const filePath = path.join(targetDir, filename);
+    if (fs.existsSync(filePath)) {
+      hash.update(fs.readFileSync(filePath));
+    }
+  }
+  return hash.digest('hex');
 }
 
 export function sanitizeShareError(input: string): string {
@@ -71,6 +147,13 @@ export async function shareToGist(
       }
     }
 
+    // Check for duplicate share (same artifact shared within 5 minutes)
+    const fingerprint = computeArtifactFingerprint(targetDir);
+    const cached = findCachedShare(fingerprint);
+    if (cached) {
+      return { url: cached.url, gistId: cached.gistId, rawUrl: cached.url + '/raw' };
+    }
+
     // Add a README for context
     const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, 'manifest.json'), 'utf-8'));
     files['README.md'] = {
@@ -103,11 +186,16 @@ export async function shareToGist(
     const result = await httpPost('https://api.github.com/gists', gistData, token);
     const parsed = JSON.parse(result);
 
-    return {
+    const shareResult = {
       url: parsed.html_url,
       gistId: parsed.id,
       rawUrl: parsed.html_url + '/raw',
     };
+
+    // Cache for dedup (prevents accidental duplicate gists)
+    cacheShare(fingerprint, shareResult);
+
+    return shareResult;
   } finally {
     if (extractDir) {
       fs.rmSync(extractDir, { recursive: true, force: true });

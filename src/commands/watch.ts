@@ -53,8 +53,8 @@ export const watchCommand = new Command('watch')
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
 
-    // If command succeeded and we're not in --always mode, just exit with same code
-    if (result.failure.exit_code === 0 && !options.always) {
+    // If command succeeded and we're not in --always mode (or config says only on failure), just exit
+    if (result.failure.exit_code === 0 && !options.always && config.watchOnlyOnFailure) {
       process.exit(0);
     }
 
@@ -127,6 +127,7 @@ export const watchCommand = new Command('watch')
         secretKeys: secrets.detectedKeys,
         includeUntracked: config.includeUntracked,
         excludePatterns: config.exclude,
+        maxArtifactSizeMB: config.maxArtifactSizeMB,
       });
 
       if (jsonMode) {

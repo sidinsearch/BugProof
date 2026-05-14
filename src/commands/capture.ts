@@ -18,6 +18,7 @@ import {
 import { determineSourceStrategy } from '../capture/source-strategy.js';
 import { captureEnvSnapshot } from '../capture/env-snapshot.js';
 import { detectProjectLanguages } from '../capture/language-support.js';
+import { createContainer } from '../sandbox/container.js';
 
 const VERSION = getBugProofVersion();
 
@@ -34,6 +35,7 @@ export const captureCommand = new Command('capture')
     return arr;
   }, [] as string[])
   .option('--json', 'Output structured JSON instead of human-readable text')
+  .option('--container', 'Run the command in a BugBox container (lightweight process isolation)')
   .option('--sign [key]', 'Cryptographically sign the artifact (Ed25519). Optional: named key or path to .key file')
   .option('--signer <identity>', 'Human-readable signer identity to embed (email, gist URL, etc.)')
   .argument('[command...]', 'The command to run and capture')
@@ -82,13 +84,37 @@ export const captureCommand = new Command('capture')
     const langContext = detectProjectLanguages(process.cwd());
 
     // 3. Execute command
-    if (!jsonMode) {
+    let effectiveCommand = commandTokens;
+    let containerCleanup = () => {};
+
+    if (options.container) {
+      if (!jsonMode) {
+        info(`Running in BugBox container: ${c.bold(commandTokens.join(' '))}`);
+      }
+      const container = createContainer({
+        command: commandTokens,
+        workingDir: process.cwd(),
+        environment: process.env as Record<string, string>,
+        timeoutMs: parseInt(options.timeout, 10),
+        network: 'none',
+        filesystem: 'readonly',
+      });
+      effectiveCommand = container.command;
+      containerCleanup = container.cleanup;
+      if (!jsonMode) {
+        info(`Container: ${c.dim(container.description)}`);
+        if (container.layersFailed.length > 0) {
+          warn(`Container layers failed: ${container.layersFailed.join(', ')}`);
+        }
+      }
+    } else if (!jsonMode) {
       info(`Running: ${c.bold(commandTokens.join(' '))}`);
-      console.log();
     }
 
+    if (!jsonMode) console.log();
+
     const runConfig: RunConfig = {
-      command: commandTokens,
+      command: effectiveCommand,
       working_directory: process.cwd(),
       environment: process.env as Record<string, string>,
       timeout_ms: parseInt(options.timeout, 10),
@@ -96,6 +122,7 @@ export const captureCommand = new Command('capture')
     };
 
     const result = await executeAndCapture(runConfig);
+    containerCleanup();
 
     if (!jsonMode) {
       if (result.failure.timeout) {

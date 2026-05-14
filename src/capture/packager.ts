@@ -111,6 +111,8 @@ export interface PackageOptions {
   signingKey?: KeyPair;
   /** Optional human-readable signer identity attached to the signature */
   signer?: string;
+  /** Maximum artifact size in MB (default: 100) */
+  maxArtifactSizeMB?: number;
 }
 
 export interface FileEntry {
@@ -119,9 +121,7 @@ export interface FileEntry {
   sha256: string;
 }
 
-const MAX_ARTIFACT_SIZE = 100 * 1024 * 1024; // 100MB hard limit
-const WARN_THRESHOLD    = 100 * 1024 * 1024;  // 100MB warning
-const MAX_FILE_COUNT    = 10000;            // 10k files hard limit
+const MAX_FILE_COUNT = 10000; // 10k files hard limit
 
 /**
  * Packages the artifact into the .bug directory format specified in design-spec.md.
@@ -155,6 +155,7 @@ export async function packageArtifact(
       options.includeUntracked ?? false,
       options.excludePatterns ?? [],
       options.sourceStrategy,
+      options.maxArtifactSizeMB ?? 100,
     );
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
@@ -273,7 +274,10 @@ function copySourceFiles(
   includeUntracked: boolean,
   excludePatterns: string[] = [],
   sourceStrategy?: SourceStrategyResult,
+  maxArtifactSizeMB = 100,
 ): FileEntry[] {
+  const maxArtifactSize = maxArtifactSizeMB * 1024 * 1024;
+  const warnThreshold = maxArtifactSize;
   let relativePaths: string[];
 
   if (sourceStrategy && sourceStrategy.filesToInclude.length > 0) {
@@ -322,9 +326,9 @@ function copySourceFiles(
 
     runningSize += stats.size;
 
-    if (runningSize > MAX_ARTIFACT_SIZE || entries.length >= MAX_FILE_COUNT) {
+    if (runningSize > maxArtifactSize || entries.length >= MAX_FILE_COUNT) {
       process.stderr.write(
-        `\n  [WARNING] Git-tracked files exceed hardware limits (100MB total or 10,000 files).\n` +
+        `\n  [WARNING] Git-tracked files exceed hardware limits (${maxArtifactSizeMB}MB total or 10,000 files).\n` +
         `  Gracefully falling back to "stacktrace-only" mode. The bug artifact will\n` +
         `  contain the command, logs, and environment, but NO source files.\n` +
         `  The limit counts files that would be packaged (git-tracked + untracked),\n` +
@@ -338,7 +342,7 @@ function copySourceFiles(
       return [];
     }
 
-    if (runningSize > WARN_THRESHOLD && entries.length > 0 && entries.length % 50 === 0) {
+    if (runningSize > warnThreshold && entries.length > 0 && entries.length % 50 === 0) {
       process.stderr.write(
         `  Warning: artifact is ${(runningSize / 1024 / 1024).toFixed(1)} MB and growing...\n`,
       );
