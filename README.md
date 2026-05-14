@@ -42,7 +42,7 @@ Think of it as **Git for bugs**: a portable, content-addressable, verifiable art
 - **No Docker. No daemon.** Uses native OS primitives — Linux namespaces, Windows Job Objects, macOS Seatbelt.
 - **Cryptographic signatures.** Ed25519 sign/verify built in. Tamper-evident artifacts via `bugproof keygen` / `--sign` / `verify`.
 - **Self-healing replay.** `--self-heal` auto-installs missing npm/pip deps in the sandbox and retries.
-- **Secrets-safe by default.** Env vars are redacted via both pattern-matching and Shannon entropy analysis — catches unknown secrets even when the key name is innocuous.
+- **Best-effort credential redaction.** Env vars are scanned via pattern-matching + Shannon entropy. Known secret shapes (API keys, tokens, JWTs) are caught; low-entropy passwords and binary credentials may still leak.
 - **Multi-language.** Detects Node.js, Python, Ruby, Go, Rust, Java, C/C++, .NET, Kotlin build context automatically.
 - **Cross-platform.** Win ↔ Linux ↔ macOS replay, with command/env translation and architecture-mismatch guardrails.
 

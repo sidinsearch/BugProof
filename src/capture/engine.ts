@@ -6,8 +6,8 @@ import { sanitizePII } from '../utils/secrets.js';
 
 
 /**
- * Spawns the command, captures its output, and produces a FailureRecord.
- * Uses streaming to handle large output without memory issues.
+ * Spawns the command, captures its output (up to 1MB per stream),
+ * and produces a FailureRecord. Output is buffered in memory.
  */
 export async function executeAndCapture(config: RunConfig): Promise<{ failure: FailureRecord, stdout: string, stderr: string }> {
   return new Promise((resolve) => {
@@ -25,14 +25,12 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
     const command = resolveExecutable(config.command[0]);
     const args = config.command.slice(1);
     
-    // We keep strings in memory for v0.1 (in v0.2 this would stream directly to disk)
     let stdoutBuffer = '';
     let stderrBuffer = '';
     let stdoutLines = 0;
     let stderrLines = 0;
     
-    // Safety limit to avoid OOM: 1MB per stream
-    const MAX_BUFFER_SIZE = 1024 * 1024; 
+    const MAX_BUFFER_SIZE = 1024 * 1024;
 
     let isTimeout = false;
     let resolved = false;

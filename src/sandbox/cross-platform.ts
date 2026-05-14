@@ -367,11 +367,11 @@ function translateShellWrapper(
 // guessing wrong. This is safer than silent corruption.
 
 const WIN_TO_UNIX_KNOWN_PATHS: Record<string, string> = {
-  '/users/': '/home/',
-  '/program files/': '/opt/',
-  '/program files (x86)/': '/opt/',
-  '/windows/': '/usr/',
   '/users/public': '/var/public',
+  '/users/': '/home/',
+  '/program files (x86)/': '/opt/',
+  '/program files/': '/opt/',
+  '/windows/': '/usr/',
 };
 
 const UNIX_TO_WIN_KNOWN_PATHS: Record<string, string> = {
@@ -388,11 +388,10 @@ function translatePathArg(arg: string, from: string, to: string): string {
 }
 
 function translatePathValue(value: string, from: string, to: string): string {
-  const lowered = value.toLowerCase();
-
   if (from === 'win32' && to !== 'win32') {
     let result = value.replace(/\\/g, '/');
     result = result.replace(/^[A-Za-z]:/, '');
+    const lowered = result.toLowerCase();
     for (const [pattern, replacement] of Object.entries(WIN_TO_UNIX_KNOWN_PATHS)) {
       if (lowered.includes(pattern)) {
         const idx = lowered.indexOf(pattern);
@@ -404,17 +403,18 @@ function translatePathValue(value: string, from: string, to: string): string {
   }
 
   if (from !== 'win32' && to === 'win32') {
-    let result = value.replace(/\//g, '\\');
-    if (result.startsWith('\\')) {
-      result = 'C:' + result;
-    }
-    const loweredResult = result.toLowerCase();
+    let result = value;
+    const loweredValue = value.toLowerCase();
     for (const [pattern, replacement] of Object.entries(UNIX_TO_WIN_KNOWN_PATHS)) {
-      if (loweredResult.includes(pattern)) {
-        const idx = loweredResult.indexOf(pattern);
+      if (loweredValue.includes(pattern)) {
+        const idx = loweredValue.indexOf(pattern);
         result = result.slice(0, idx) + replacement + result.slice(idx + pattern.length);
         break;
       }
+    }
+    result = result.replace(/\//g, '\\');
+    if (result.startsWith('\\')) {
+      result = 'C:' + result;
     }
     return result;
   }
@@ -442,6 +442,8 @@ function platformName(p: string): string {
 
 function isScriptingCommand(name: string): boolean {
   const crossPlatformCommands = [
+    // Shells
+    'bash', 'sh', 'zsh', 'fish', 'powershell', 'pwsh',
     // Scripting runtimes
     'node', 'python', 'python3', 'ruby', 'perl', 'php', 'deno', 'bun',
     // JVM

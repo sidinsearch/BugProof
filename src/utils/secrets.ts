@@ -1,3 +1,9 @@
+// Best-effort pattern redaction for common credential formats.
+// NOT a security boundary — low-entropy passwords, structured secrets,
+// binary .pem/.key blobs, and env vars with embedded tokens in innocent-looking
+// keys may still leak. Callers should validate with --skip-secrets and
+// manual review before sharing artifacts publicly.
+
 const SECRET_PATTERNS = [
   /api_?key/i,
   /secret/i,
@@ -139,7 +145,9 @@ const PII_PATTERNS = [
   { regex: /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g, replacement: '[REDACTED_IP]' },
   { regex: /\b(sk_live|sk_test|pk_live|pk_test)_[0-9a-zA-Z]{20,}\b/g, replacement: '[REDACTED_STRIPE_KEY]' },
   { regex: /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}\b/g, replacement: '[REDACTED_GITHUB_TOKEN]' },
-  { regex: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, replacement: '[REDACTED_CREDIT_CARD]' }
+  { regex: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, replacement: '[REDACTED_CREDIT_CARD]' },
+  { regex: /\bAKIA[A-Z0-9]{16}\b/g, replacement: '[REDACTED_AWS_KEY]' },
+  { regex: /-----BEGIN (?:OPENSSH|RSA|DSA|EC) PRIVATE KEY-----[\s\S]*?-----END (?:OPENSSH|RSA|DSA|EC) PRIVATE KEY-----/g, replacement: '[REDACTED_SSH_KEY]' },
 ];
 
 export function sanitizePII(text: string): string {

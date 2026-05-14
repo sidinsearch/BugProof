@@ -1,0 +1,16 @@
+{
+  "name": "bugproof-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for BugProof — capture, replay, and inspect .bug artifacts",
+  "type": "module",
+  "bin": {
+    "bugproof-mcp": "dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.16.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

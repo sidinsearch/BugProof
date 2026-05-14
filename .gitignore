@@ -45,6 +45,7 @@ docs/
 .gemini/
 .github/
 !.github/workflows/
+!.github/actions/
 .gstack/
 .gstack-worktrees/
 .gstack-context.md

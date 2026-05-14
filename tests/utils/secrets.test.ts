@@ -87,6 +87,16 @@ describe('Secrets Utility', () => {
       expect(sanitizePII(text2)).toBe('Another card [REDACTED_CREDIT_CARD] failed.');
     });
 
+    it('should mask AWS access keys', () => {
+      const text = 'Using key AKIAIOSFODNN7EXAMPLE in config.';
+      expect(sanitizePII(text)).toBe('Using key [REDACTED_AWS_KEY] in config.');
+    });
+
+    it('should mask SSH private key blocks', () => {
+      const text = '-----BEGIN OPENSSH PRIVATE KEY-----\nfakekeydata\n-----END OPENSSH PRIVATE KEY-----';
+      expect(sanitizePII(text)).toContain('[REDACTED_SSH_KEY]');
+    });
+
     it('should leave normal text alone', () => {
       const text = 'This is a normal log message with numbers 1234 and words.';
       expect(sanitizePII(text)).toBe(text);

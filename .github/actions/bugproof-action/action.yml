@@ -1,0 +1,73 @@
+name: BugProof Capture
+description: Capture a failing command as a .bug artifact in CI
+
+inputs:
+  command:
+    description: Command to capture (e.g. 'npm test' or './ci.sh')
+    required: true
+  name:
+    description: Artifact name (defaults to bug_<timestamp>)
+    required: false
+  timeout:
+    description: Command timeout in milliseconds
+    required: false
+    default: '300000'
+  skip-secrets:
+    description: Skip environment secret scanning
+    required: false
+    default: 'false'
+  upload-artifact:
+    description: Upload .bug file as a GitHub Actions artifact
+    required: false
+    default: 'true'
+  node-version:
+    description: Node.js version for bugproof
+    required: false
+    default: '24'
+
+outputs:
+  artifact-path:
+    description: Path to the generated .bug artifact
+    value: ${{ steps.capture.outputs.artifact-path }}
+  exit-code:
+    description: Exit code of the captured command
+    value: ${{ steps.capture.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install bugproof
+      shell: bash
+      run: npm install -g bugproof
+
+    - name: Capture command
+      id: capture
+      shell: bash
+      run: |
+        ARGS=""
+        if [ -n "${{ inputs.name }}" ]; then
+          ARGS="$ARGS -n ${{ inputs.name }}"
+        fi
+        if [ "${{ inputs.skip-secrets }}" = "true" ]; then
+          ARGS="$ARGS --skip-secrets"
+        fi
+        ARTIFACT_NAME="${name:-bug_$(date +%s)}"
+        bugproof capture $ARGS --timeout ${{ inputs.timeout }} -- ${{ inputs.command }}
+        echo "artifact-path=${ARTIFACT_NAME}.bug" >> $GITHUB_OUTPUT
+        echo "exit-code=$?" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      if: ${{ inputs.upload-artifact == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name || 'bugproof-capture' }}
+        path: ${{ steps.capture.outputs.artifact-path }}
+        if-no-files-found: error
