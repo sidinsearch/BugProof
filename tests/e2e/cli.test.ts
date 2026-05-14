@@ -269,19 +269,19 @@ describe('CLI end-to-end', () => {
     }
   }, 15000);
 
-  // Phase 1: CLI Modularization — all 11 commands registered
-  it('should list all 11 commands in help output', () => {
+  // Phase 1: CLI Modularization — all 12 commands registered
+  it('should list all 12 commands in help output', () => {
     const r = run('--help', process.cwd());
     expect(r.status).toBe(0);
     for (const cmd of ['capture', 'replay', 'inspect', 'diff', 'watch',
-      'init', 'share', 'prune', 'doctor', 'keygen', 'verify']) {
+      'init', 'share', 'prune', 'doctor', 'keygen', 'verify', 'mcp']) {
       expect(r.stdout).toContain(cmd);
     }
   });
 
   it('each command should show --help without error', () => {
     for (const cmd of ['capture', 'replay', 'inspect', 'diff', 'watch',
-      'init', 'share', 'prune', 'doctor', 'keygen', 'verify']) {
+      'init', 'share', 'prune', 'doctor', 'keygen', 'verify', 'mcp']) {
       const r = run(`${cmd} --help`, process.cwd());
       expect(r.status).toBe(0);
       expect(r.stdout).toContain(cmd);

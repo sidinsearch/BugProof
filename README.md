@@ -64,6 +64,137 @@ bugproof doctor
 
 ---
 
+## GitHub Action — Capture CI Failures Automatically
+
+Add a single step to any GitHub Actions workflow to auto-capture flaky/failing commands as `.bug` artifacts.
+
+```yaml
+- name: Capture flaky test
+  uses: sidinsearch/BugProof/.github/actions/bugproof-action@main
+  with:
+    command: 'npm test -- --run flaky-suite'
+    name: flaky-test-failure
+    timeout: 300000
+```
+
+**How it works**: The action installs `bugproof` from **npmjs.org** (`npm install -g bugproof`) → wraps your command with `bugproof capture` → on failure, the `.bug` artifact is uploaded to the Actions run. Developers download and repro locally with `bugproof replay`.
+
+**Use cases**:
+- **Flaky CI tests**: Capture the exact failure for local debugging
+- **Cross-platform failures**: A test passes on Linux CI but fails on macOS — capture the failure on both and diff
+- **Intermittent crashes**: `bugproof capture -- node app.js` bundles the crash state, env, and source
+
+**All inputs**:
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `command` | ✅ | — | Command to capture (e.g. `npm test`) |
+| `name` | — | `bug_<timestamp>` | Artifact name |
+| `timeout` | — | `300000` | Command timeout in ms |
+| `skip-secrets` | — | `false` | Skip env secret scanning |
+| `upload-artifact` | — | `true` | Upload .bug file as Actions artifact |
+| `node-version` | — | `24` | Node.js version for bugproof |
+
+The action lives at `.github/actions/bugproof-action/action.yml` in this repo. Reference it via `uses: sidinsearch/BugProof/.github/actions/bugproof-action@main`. BugProof is always installed from npmjs.org — no GitHub Packages token needed.
+
+---
+
+## MCP Server — AI-Agent Integration
+
+BugProof ships a built-in **MCP (Model Context Protocol) server** that exposes capture, replay, inspect, and diff as tools any MCP-compatible host can call. Listed on the [Official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.sidinsearch/bugproof`.
+
+### Setup
+
+#### Claude Code
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "bugproof": {
+      "command": "npx",
+      "args": ["-y", "bugproof", "mcp"]
+    }
+  }
+}
+```
+
+#### Cursor
+
+Add to Cursor MCP config (Settings → Features → MCP):
+
+```json
+{
+  "mcpServers": {
+    "bugproof": {
+      "command": "npx",
+      "args": ["-y", "bugproof", "mcp"]
+    }
+  }
+}
+```
+
+#### Continue.dev
+
+Add to `~/.continue/config.json`:
+
+```json
+{
+  "experimental": {
+    "mcpServers": {
+      "bugproof": {
+        "command": "npx",
+        "args": ["-y", "bugproof", "mcp"]
+      }
+    }
+  }
+}
+```
+
+#### With bugproof installed globally
+
+If you already have bugproof globally (`npm install -g bugproof`), omit `npx -y`:
+
+```json
+{
+  "mcpServers": {
+    "bugproof": {
+      "command": "bugproof",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**No separate MCP install needed.** `npx -y bugproof mcp` auto-downloads from npmjs.org and starts the server over stdio.
+
+### Tools
+
+| Tool | Description | When an AI agent would use it |
+|---|---|---|
+| `capture` | Run a command, capture as .bug artifact | "Capture this failing test and tell me what changed" |
+| `replay` | Replay a .bug file, return verdict | "Replay the artifact from CI and confirm it still fails" |
+| `inspect` | Show artifact metadata | "What's in this .bug file without running it?" |
+| `diff` | Compare two artifacts | "Compare the CI capture with my local capture — what's different?" |
+| `doctor` | Check sandbox capabilities | "Does this machine support full sandbox isolation?" |
+
+### Example AI session
+
+```
+User:   Capture the failing test and tell me what went wrong
+Agent:  [calls bugproof capture -- npm test -- --run flaky-suite]
+        [calls bugproof inspect on the result]
+        "The test failed with a timeout. Fingerprint matches a known
+         Redis-unreachable pattern. Here's the captured stderr..."
+```
+
+The MCP server communicates over **stdio** (JSON-RPC 2.0). It shells out to the local `bugproof` CLI with `--json` output and returns structured results. If bugproof isn't installed, `npx -y` fetches it from npmjs.org — no global install required.
+
+The standalone MCP server wrapper is also at `mcp-server/index.ts` and can be published independently if needed.
+
+---
+
 ## 60-Second Quick Start
 
 ```bash

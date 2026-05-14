@@ -46,12 +46,10 @@ concurrency:
 
 # Least-privilege permissions — only what each job actually exercises:
 #   contents:write   → tag push (auto-version), GitHub Release creation
-#   packages:write   → GitHub Packages mirror publish
 #   id-token:write   → sigstore provenance (when repo is public)
 #   actions:read     → workflow_dispatch input access
 permissions:
   contents: write
-  packages: write
   id-token: write
   actions: read
 
@@ -478,44 +476,6 @@ jobs:
             echo "::notice::Published bugproof@${VERSION} to npmjs.org (no provenance: private repo)"
           fi
 
-      # ----- GitHub Packages mirror -----
-      # GitHub Packages requires scoped package names. We rewrite package.json
-      # in-memory to publish under @sidinsearch/bugproof, then revert.
-      # GITHUB_TOKEN is auto-provisioned per run (no secret setup needed).
-      - name: Publish mirror to GitHub Packages (scoped to @<repo-owner>)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_OWNER: ${{ github.repository_owner }}
-        run: |
-          set -e
-          echo "Preparing scoped package for GitHub Packages..."
-          # Backup original package.json
-          cp package.json package.json.bak
-
-          # Rewrite name to scoped variant (lowercase owner per npm rules)
-          OWNER_LC=$(echo "$GH_OWNER" | tr '[:upper:]' '[:lower:]')
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.name = '@${OWNER_LC}/bugproof';
-            pkg.publishConfig = { registry: 'https://npm.pkg.github.com' };
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-          # Auth file scoped to GitHub Packages registry
-          {
-            echo "@${OWNER_LC}:registry=https://npm.pkg.github.com"
-            echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
-          } > .npmrc
-
-          echo "Publishing @${OWNER_LC}/bugproof@${VERSION} to GitHub Packages..."
-          npm publish --access public --ignore-scripts
-
-          # Restore original state so subsequent steps see the canonical package
-          mv package.json.bak package.json
-          rm -f .npmrc
-          echo "::notice::Published @${OWNER_LC}/bugproof@${VERSION} to GitHub Packages"
-
       # Use `gh release create` CLI (pre-installed on all GitHub runners) instead
       # of a third-party action. This eliminates the last Node.js deprecation
       # warning — gh CLI is a native Go binary with no Node runtime dependency.
@@ -528,29 +488,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.auto-version.outputs.tag_name }}
-          GH_OWNER: ${{ github.repository_owner }}
         run: |
           set -e
           # Build the static intro body (will be prepended to auto-generated notes)
           cat > /tmp/release-intro.md <<EOF
-          ## 📦 BugProof v${VERSION}
+          ## BugProof v${VERSION}
 
-          ### Install from npmjs.org (recommended)
+          ### Install from npmjs.org
           \`\`\`bash
           npm install -g bugproof@${VERSION}
-          \`\`\`
-
-          ### Install from GitHub Packages
-          \`\`\`bash
-          npm install -g @${GH_OWNER}/bugproof@${VERSION} \\
-            --registry=https://npm.pkg.github.com
           \`\`\`
 
           ### Verification
           - ✅ Tested on Ubuntu, Windows, macOS (Node 24 LTS)
           - ✅ Security audit (npm audit --audit-level=high)
           - ✅ Published to npmjs.org
-          - ✅ Mirrored to GitHub Packages
 
           ### 🚀 Quick Start
           \`\`\`bash
@@ -669,12 +621,61 @@ jobs:
           exit 1
   
   # ========================================
-  # Phase 7: Notify on Failure
+  # Phase 7: Publish to MCP Registry
+  # ========================================
+  mcp-registry:
+    name: Publish to MCP Registry
+    runs-on: ubuntu-latest
+    needs: [auto-version, publish]
+    timeout-minutes: 5
+    if: needs.publish.result == 'success'
+    # The MCP Registry is still in preview — a registry outage should never
+    # block the actual npm/GitHub release.
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.auto-version.outputs.tag_name }}
+
+      - name: Set version from auto-version job
+        env:
+          NEW_VERSION: ${{ needs.auto-version.outputs.new_version }}
+        run: |
+          set -e
+          if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "::error::Invalid SemVer from auto-version: $NEW_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      - name: Authenticate via GitHub OIDC
+        run: mcp-publisher login github-oidc
+
+      - name: Update version in server.json
+        run: |
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+
+      - name: Publish to MCP Registry
+        run: mcp-publisher publish
+
+      - name: Report result
+        if: success()
+        run: echo "::notice::Published io.github.sidinsearch/bugproof@${VERSION} to MCP Registry"
+
+  # ========================================
+  # Phase 8: Notify on Failure
   # ========================================
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [test-matrix, security-audit, smoke-install, auto-version, publish, post-publish-verify]
+    needs: [test-matrix, security-audit, smoke-install, auto-version, publish, post-publish-verify, mcp-registry]
     # Notify on any release-flow failure (auto push OR manual workflow_dispatch).
     # PR runs are excluded since the PR check itself surfaces failure.
     if: |

@@ -410,4 +410,56 @@ describe('cross-platform edge cases', () => {
     expect(result.blockers).toHaveLength(0);
     expect(result.translations).toHaveLength(0);
   });
+
+  // Regression: lowered was computed before backslash→slash conversion,
+  // so Win→Unix known-paths like /users/ never matched C:\Users\...
+  it('Win→Unix: known-paths should match after backslash normalization', () => {
+    const result = translateCommand(['node', 'C:\\Users\\Public\\test.js'], 'win32', 'linux');
+    expect(result.command[1]).toMatch(/^\/var\/public\/test\.js$/i);
+  });
+
+  // Regression: Unix→Win known-paths were matched after backslash reversal,
+  // so /home/ never matched C:\Users\
+  it('Unix→Win: known-paths should match before backslash reversal', () => {
+    const result = translateCommand(['node', '/home/user/app.js'], 'linux', 'win32');
+    const p = result.command[1];
+    expect(p).toMatch(/^C:\\Users\\/);
+    expect(p).not.toContain('/home/');
+  });
+
+  // Regression: bash/sh/zsh/fish/powershell/pwsh were not in isScriptingCommand
+  // and would be falsely flagged as ELF blockers on cross-family translation
+  it('should not flag bash as ELF blocker on Linux→Win', () => {
+    const result = translateCommand(['bash', 'script.sh'], 'linux', 'win32');
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  it('should not flag zsh as ELF blocker on Linux→Win', () => {
+    const result = translateCommand(['zsh', 'script.zsh'], 'linux', 'win32');
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  it('should not flag fish as ELF blocker on Linux→Win', () => {
+    const result = translateCommand(['fish', 'script.fish'], 'linux', 'win32');
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  it('should not flag powershell as ELF blocker on Linux→Win', () => {
+    const result = translateCommand(['powershell', '-c', 'ls'], 'linux', 'win32');
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  it('should not flag pwsh as ELF blocker on Linux→Win', () => {
+    const result = translateCommand(['pwsh', '-c', 'ls'], 'linux', 'win32');
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  // Known-paths ordering: specific before generic (/users/public before /users/)
+  it('Win→Unix: /users/public should match before generic /users/ fallback', () => {
+    const publicResult = translateCommand(['cat', 'C:\\Users\\Public\\doc.txt'], 'win32', 'linux');
+    expect(publicResult.command[1]).toMatch(/^\/var\/public\/doc\.txt$/i);
+
+    const userResult = translateCommand(['cat', 'C:\\Users\\alice\\doc.txt'], 'win32', 'linux');
+    expect(userResult.command[1]).toMatch(/^\/home\/alice\/doc\.txt$/i);
+  });
 });

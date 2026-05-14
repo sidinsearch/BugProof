@@ -1,16 +1,25 @@
 {
-  "name": "bugproof-mcp-server",
+  "name": "@bugproof/mcp-server",
   "version": "1.0.0",
-  "description": "MCP server for BugProof — capture, replay, and inspect .bug artifacts",
+  "description": "MCP server for BugProof — AI-agent integration for executable bug artifacts",
   "type": "module",
   "bin": {
-    "bugproof-mcp": "dist/index.js"
+    "bugproof-mcp": "index.js"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.16.0"
+  "scripts": {
+    "start": "node index.js"
   },
-  "devDependencies": {
-    "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+  "keywords": ["bugproof", "mcp", "debug", "testing", "ai"],
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/sidinsearch/BugProof/issues"
+  },
+  "homepage": "https://github.com/sidinsearch/BugProof#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sidinsearch/BugProof.git"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

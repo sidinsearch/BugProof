@@ -12,6 +12,7 @@ import { pruneCommand } from './commands/prune.js';
 import { doctorCommand } from './commands/doctor.js';
 import { keygenCommand } from './commands/keygen.js';
 import { verifyCommand } from './commands/verify.js';
+import { mcpCommand } from './commands/mcp.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
@@ -47,5 +48,6 @@ program.addCommand(pruneCommand);
 program.addCommand(doctorCommand);
 program.addCommand(keygenCommand);
 program.addCommand(verifyCommand);
+program.addCommand(mcpCommand);
 
 program.parse(process.argv);
