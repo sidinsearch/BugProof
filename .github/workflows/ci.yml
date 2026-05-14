@@ -17,6 +17,7 @@ on:
       - 'tsconfig.json'
       - 'jest.config.js'
       - 'assets/**'
+      - 'server.json'
       - '.github/workflows/**'
   pull_request:
     paths:
@@ -28,6 +29,7 @@ on:
       - 'tsconfig.json'
       - 'jest.config.js'
       - 'assets/**'
+      - 'server.json'
       - '.github/workflows/**'
   workflow_dispatch:
     inputs:
@@ -117,6 +119,76 @@ jobs:
           path: coverage/
           retention-days: 7
           if-no-files-found: ignore
+
+  # ========================================
+  # Phase 1b: Generate .bug Artifacts (cross-platform)
+  # ========================================
+  capture-artifacts:
+    name: Generate .bug Artifacts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: test-matrix
+    timeout-minutes: 10
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create test project
+        shell: bash
+        run: |
+          mkdir -p /tmp/bugproof-capture-test
+          cd /tmp/bugproof-capture-test
+          git init -q
+          git config user.email "ci@bugproof.dev"
+          git config user.name "CI Bot"
+          echo "platform: $(uname -s)" > platform.txt
+          echo "node: $(node --version)" >> platform.txt
+          git add .
+          git commit -q -m "ci capture test"
+
+      - name: Capture success case (exit 0)
+        id: capture-success
+        shell: bash
+        run: |
+          cd /tmp/bugproof-capture-test
+          node $GITHUB_WORKSPACE/dist/cli.js capture --skip-secrets -n "ci-success-${{ matrix.os }}" -- node -e "console.log('CI test OK on ${{ matrix.os }}')"
+
+      - name: Capture failure case (exit 1)
+        id: capture-failure
+        shell: bash
+        if: always()
+        run: |
+          cd /tmp/bugproof-capture-test
+          node $GITHUB_WORKSPACE/dist/cli.js capture --skip-secrets -n "ci-failure-${{ matrix.os }}" -- node -e "throw new Error('CI failure test ${{ matrix.os }}')"
+
+      - name: List captured artifacts
+        shell: bash
+        run: |
+          echo "=== .bug artifacts generated ==="
+          ls -la /tmp/bugproof-capture-test/bug_*.bug 2>/dev/null || echo "No .bug files found"
+
+      - name: Upload .bug artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: bug-artifacts-${{ matrix.os }}
+          path: /tmp/bugproof-capture-test/bug_*.bug
+          retention-days: 30
+          if-no-files-found: warn
 
   # ========================================
   # Phase 2: Security & Package Validation
