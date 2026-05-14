@@ -352,6 +352,35 @@ function translateShellWrapper(
 }
 
 // ── Path translation ──
+//
+// Translates paths between Windows and Unix conventions.
+// Known limitations (won't fix — these are cross-family best-effort):
+//   - Non-English Windows: C:\Users\ is English-only. German=C:\Benutzer\, French=C:\Utilisateurs\,
+//     Japanese=C:\ユーザー\. These won't match the known-paths table and will fall through unmodified.
+//   - Mapped drives / network shares: Z:\Data won't map to a meaningful Unix path; falls through.
+//   - Drive letters other than C: D:\path strips to /path which likely doesn't exist on Unix.
+//   - UNC paths (\\server\share): not detected as paths by looksLikePath(); passed through unchanged.
+//   - Junctions / symlinks: Windows `C:\Users\foo\AppData\Local` is a junction to C:\ProgramData;
+//     we don't resolve junctions. The raw path is what gets translated.
+//
+// When a path doesn't match known patterns, it's returned unmodified rather than
+// guessing wrong. This is safer than silent corruption.
+
+const WIN_TO_UNIX_KNOWN_PATHS: Record<string, string> = {
+  '/users/': '/home/',
+  '/program files/': '/opt/',
+  '/program files (x86)/': '/opt/',
+  '/windows/': '/usr/',
+  '/users/public': '/var/public',
+};
+
+const UNIX_TO_WIN_KNOWN_PATHS: Record<string, string> = {
+  '/home/': 'C:\\Users\\',
+  '/opt/': 'C:\\Program Files\\',
+  '/usr/': 'C:\\Windows\\',
+  '/var/': 'C:\\Users\\Public\\',
+  '/tmp/': 'C:\\Temp\\',
+};
 
 function translatePathArg(arg: string, from: string, to: string): string {
   if (!looksLikePath(arg, from)) return arg;
@@ -359,25 +388,34 @@ function translatePathArg(arg: string, from: string, to: string): string {
 }
 
 function translatePathValue(value: string, from: string, to: string): string {
+  const lowered = value.toLowerCase();
+
   if (from === 'win32' && to !== 'win32') {
-    // Windows → Unix: C:\Users\foo → /home/foo (best effort)
     let result = value.replace(/\\/g, '/');
-    // Strip drive letter
     result = result.replace(/^[A-Za-z]:/, '');
-    // Map common Windows paths
-    result = result.replace(/^\/Users\//, '/home/');
+    for (const [pattern, replacement] of Object.entries(WIN_TO_UNIX_KNOWN_PATHS)) {
+      if (lowered.includes(pattern)) {
+        const idx = lowered.indexOf(pattern);
+        result = result.slice(0, idx) + replacement + result.slice(idx + pattern.length);
+        break;
+      }
+    }
     return result;
   }
 
   if (from !== 'win32' && to === 'win32') {
-    // Unix → Windows: /home/foo/project → C:\Users\foo\project (best effort)
     let result = value.replace(/\//g, '\\');
-    // Add drive letter if absolute
     if (result.startsWith('\\')) {
       result = 'C:' + result;
     }
-    // Map common Unix paths
-    result = result.replace(/^C:\\home\\/, 'C:\\Users\\');
+    const loweredResult = result.toLowerCase();
+    for (const [pattern, replacement] of Object.entries(UNIX_TO_WIN_KNOWN_PATHS)) {
+      if (loweredResult.includes(pattern)) {
+        const idx = loweredResult.indexOf(pattern);
+        result = result.slice(0, idx) + replacement + result.slice(idx + pattern.length);
+        break;
+      }
+    }
     return result;
   }
 

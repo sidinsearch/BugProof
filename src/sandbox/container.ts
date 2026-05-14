@@ -1,35 +1,12 @@
 /**
  * BugBox Container — Lightweight process isolation without Docker
- * 
- * This is BugProof's own container-like sandbox that provides Docker-level
- * isolation using native OS primitives. No Docker daemon, no images, no 400MB overhead.
- * 
- * Architecture per platform:
- * 
- * Linux (best isolation):
- *   - User namespace (unshare --user): no root needed
- *   - PID namespace (unshare --pid): isolated process tree
- *   - Mount namespace (unshare --mount): private /tmp, /proc
- *   - Network namespace (unshare --net): loopback only (optional)
- *   - tmpfs overlay: writable overlay on top of read-only source
- *   - cgroups v2: memory + CPU limits
- * 
- * Windows:
- *   - Job Object: process group isolation + resource limits
- *   - Restricted token: reduced privileges
- *   - Private temp directory: isolated temp space
- *   - Firewall rules: network blocking (optional)
- * 
- * macOS:
- *   - sandbox-exec: Apple's built-in sandbox profiles
- *   - Filesystem deny rules: restrict to artifact directory only
- *   - Private temp directory
- * 
- * All platforms:
- *   - Environment sanitization (strip dangerous vars)
- *   - Read-only source mount (writable workspace overlay)
- *   - Temp directory isolation
- *   - Automatic cleanup on exit
+ *
+ * Uses native OS primitives per platform:
+ *   Linux:   unshare (user+pid+mount+net namespaces), cgroups v2, fuse-overlayfs
+ *   Windows: Job Objects, netsh firewall rules
+ *   macOS:   sandbox-exec
+ *
+ * No daemon, no images, no root required (Linux user namespaces are unprivileged).
  */
 
 import * as fs from 'fs';
@@ -40,122 +17,93 @@ import { detectCapabilities, PlatformCapabilities } from './capabilities.js';
 import { addFirewallBlockRule } from './network.js';
 
 export interface ContainerConfig {
-  /** The command to run inside the container */
   command: string[];
-  /** Working directory (source files) */
   workingDir: string;
-  /** Environment variables to pass through */
   environment: Record<string, string>;
-  /** Timeout in ms */
   timeoutMs: number;
-  /** Resource limits */
   limits?: {
     maxMemoryMB?: number;
     maxCpuPercent?: number;
     maxPids?: number;
   };
-  /** Network access */
   network: 'none' | 'loopback' | 'full';
-  /** Filesystem access level */
   filesystem: 'readonly' | 'overlay' | 'full';
 }
 
 export interface ContainerResult {
-  /** The transformed command array to execute */
   command: string[];
-  /** Environment variables (sanitized) */
   environment: Record<string, string>;
-  /** Working directory for execution */
   workingDir: string;
-  /** What isolation layers were applied */
-  layers: ContainerLayer[];
-  /** Cleanup function — MUST be called after execution */
+  layersApplied: string[];
+  layersFailed: string[];
   cleanup: () => void;
-  /** Human-readable description */
   description: string;
 }
 
-interface ContainerLayer {
-  name: string;
-  applied: boolean;
-  reason: string;
-}
-
-/**
- * Creates a lightweight container environment for running a command.
- * Returns a modified command, environment, and cleanup function.
- * 
- * This does NOT execute the command — it prepares the isolation layers
- * and returns everything needed for the caller to spawn the process.
- */
 export function createContainer(config: ContainerConfig): ContainerResult {
   const caps = detectCapabilities();
-  const layers: ContainerLayer[] = [];
+  const layersApplied: string[] = [];
+  const layersFailed: string[] = [];
   let command = [...config.command];
   let environment = { ...config.environment };
   let workingDir = config.workingDir;
   const cleanupFns: (() => void)[] = [];
 
-  // 1. Create isolated temp directory
   const containerTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bugbox-container-'));
   cleanupFns.push(() => {
-    try { fs.rmSync(containerTmp, { recursive: true, force: true }); } catch {
-      // Ignore cleanup errors (e.g., permissions or race conditions)
-    }
+    try { fs.rmSync(containerTmp, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
   });
 
-  // Override temp vars to point to our isolated temp
   environment.TMPDIR = containerTmp;
   environment.TMP = containerTmp;
   environment.TEMP = containerTmp;
-  layers.push({ name: 'temp-isolation', applied: true, reason: 'Isolated temp directory' });
+  layersApplied.push('temp-isolation');
 
-  // 2. Create writable workspace overlay
   if (config.filesystem === 'overlay' || config.filesystem === 'readonly') {
     const overlayResult = createWorkspaceOverlay(config.workingDir, containerTmp, caps);
     if (overlayResult.applied) {
       workingDir = overlayResult.workingDir;
       cleanupFns.push(overlayResult.cleanup);
-      layers.push({ name: 'filesystem-overlay', applied: true, reason: overlayResult.reason });
+      layersApplied.push('filesystem-overlay');
     } else {
-      layers.push({ name: 'filesystem-overlay', applied: false, reason: overlayResult.reason });
+      layersFailed.push('filesystem-overlay');
     }
   }
 
-  // 3. Sanitize environment
   environment = sanitizeContainerEnv(environment);
-  layers.push({ name: 'env-sanitize', applied: true, reason: 'Stripped dangerous environment variables' });
+  layersApplied.push('env-sanitize');
 
-  // 4. Apply platform-specific isolation
   if (caps.platform === 'linux') {
-    const linuxResult = applyLinuxIsolation(command, caps, config, containerTmp);
+    const linuxResult = applyLinuxIsolation(command, caps, config);
     command = linuxResult.command;
-    for (const layer of linuxResult.layers) layers.push(layer);
+    layersApplied.push(...linuxResult.applied);
+    layersFailed.push(...linuxResult.failed);
     cleanupFns.push(...linuxResult.cleanupFns);
   } else if (caps.platform === 'win32') {
-    const winResult = applyWindowsIsolation(command, caps, config, containerTmp);
+    const winResult = applyWindowsIsolation(command, caps, config);
     command = winResult.command;
-    for (const layer of winResult.layers) layers.push(layer);
+    layersApplied.push(...winResult.applied);
+    layersFailed.push(...winResult.failed);
     cleanupFns.push(...winResult.cleanupFns);
   } else if (caps.platform === 'darwin') {
     const macResult = applyMacIsolation(command, caps, config, workingDir, containerTmp);
     command = macResult.command;
-    for (const layer of macResult.layers) layers.push(layer);
+    layersApplied.push(...macResult.applied);
+    layersFailed.push(...macResult.failed);
   }
 
-  const appliedCount = layers.filter(l => l.applied).length;
-  const description = `BugBox container: ${appliedCount}/${layers.length} isolation layers active (${caps.platform})`;
+  const total = layersApplied.length + layersFailed.length;
+  const description = `BugBox container: ${layersApplied.length}/${total} isolation layers active (${caps.platform})`;
 
   return {
     command,
     environment,
     workingDir,
-    layers,
+    layersApplied,
+    layersFailed,
     cleanup: () => {
       for (const fn of cleanupFns.reverse()) {
-        try { fn(); } catch {
-          // Ignore cleanup errors (e.g., already cleaned up or permissions)
-        }
+        try { fn(); } catch { /* cleanup best-effort */ }
       }
     },
     description,
@@ -167,7 +115,6 @@ export function createContainer(config: ContainerConfig): ContainerResult {
 interface OverlayResult {
   applied: boolean;
   workingDir: string;
-  reason: string;
   cleanup: () => void;
 }
 
@@ -176,7 +123,6 @@ function createWorkspaceOverlay(
   containerTmp: string,
   caps: PlatformCapabilities,
 ): OverlayResult {
-  // On Linux with overlayfs support, create a true overlay
   if (caps.platform === 'linux') {
     const upperDir = path.join(containerTmp, 'upper');
     const workDir = path.join(containerTmp, 'work');
@@ -186,9 +132,7 @@ function createWorkspaceOverlay(
     fs.mkdirSync(workDir, { recursive: true });
     fs.mkdirSync(mergedDir, { recursive: true });
 
-    // Try overlayfs mount (requires user namespace or fuse-overlayfs)
     const fuseOverlay = spawnSync('which', ['fuse-overlayfs'], { encoding: 'utf-8', timeout: 2000 });
-    
     if (fuseOverlay.status === 0) {
       const mount = spawnSync('fuse-overlayfs', [
         '-o', `lowerdir=${sourceDir},upperdir=${upperDir},workdir=${workDir}`,
@@ -199,26 +143,16 @@ function createWorkspaceOverlay(
         return {
           applied: true,
           workingDir: mergedDir,
-          reason: 'fuse-overlayfs: source read-only, changes in overlay',
-          cleanup: () => {
-            spawnSync('fusermount', ['-u', mergedDir], { timeout: 5000 });
-          },
+          cleanup: () => { spawnSync('fusermount', ['-u', mergedDir], { timeout: 5000 }); },
         };
       }
     }
   }
 
-  // Fallback for all platforms: copy to a writable workspace
   const workspaceDir = path.join(containerTmp, 'workspace');
   fs.mkdirSync(workspaceDir, { recursive: true });
   copyDirShallow(sourceDir, workspaceDir);
-
-  return {
-    applied: true,
-    workingDir: workspaceDir,
-    reason: 'Copy-on-write workspace (shallow copy)',
-    cleanup: () => {},
-  };
+  return { applied: true, workingDir: workspaceDir, cleanup: () => {} };
 }
 
 // ── Linux Isolation ──
@@ -227,56 +161,40 @@ function applyLinuxIsolation(
   command: string[],
   caps: PlatformCapabilities,
   config: ContainerConfig,
-  _containerTmp: string,
-): { command: string[]; layers: ContainerLayer[]; cleanupFns: (() => void)[] } {
-  const layers: ContainerLayer[] = [];
+): { command: string[]; applied: string[]; failed: string[]; cleanupFns: (() => void)[] } {
+  const applied: string[] = [];
+  const failed: string[] = [];
   const cleanupFns: (() => void)[] = [];
   let cmd = [...command];
 
   if (caps.hasUnshare) {
-    const unshareArgs = ['unshare'];
+    const unshareArgs = ['unshare', '--user', '--map-root-user', '--pid', '--fork', '--mount'];
+    applied.push('user-namespace', 'pid-namespace', 'mount-namespace');
 
-    // User namespace (allows other namespaces without root)
-    unshareArgs.push('--user', '--map-root-user');
-    layers.push({ name: 'user-namespace', applied: true, reason: 'Unprivileged user namespace' });
-
-    // PID namespace
-    unshareArgs.push('--pid', '--fork');
-    layers.push({ name: 'pid-namespace', applied: true, reason: 'Isolated process tree' });
-
-    // Mount namespace with private /proc
-    unshareArgs.push('--mount');
-    layers.push({ name: 'mount-namespace', applied: true, reason: 'Private mount namespace' });
-
-    // Network namespace (if requested)
     if (config.network === 'none' || config.network === 'loopback') {
       unshareArgs.push('--net');
-      layers.push({ name: 'network-namespace', applied: true, reason: 'Network isolated (loopback only)' });
+      applied.push('network-namespace');
     } else {
-      layers.push({ name: 'network-namespace', applied: false, reason: 'Full network access requested' });
+      failed.push('network-namespace');
     }
 
     unshareArgs.push('--');
     cmd = [...unshareArgs, ...cmd];
   } else {
-    layers.push({ name: 'namespaces', applied: false, reason: 'unshare not available' });
+    failed.push('namespaces');
   }
 
-  // Resource limits via cgroups v2
-  if (caps.hasCgroupsV2 && config.limits) {
-    const { maxMemoryMB, maxCpuPercent } = config.limits;
-    if (maxMemoryMB || maxCpuPercent) {
-      const args = ['systemd-run', '--user', '--scope', '--quiet'];
-      if (maxMemoryMB) args.push('-p', `MemoryMax=${maxMemoryMB}M`);
-      if (maxCpuPercent) args.push('-p', `CPUQuota=${maxCpuPercent}%`);
-      if (config.limits.maxPids) args.push('-p', `TasksMax=${config.limits.maxPids}`);
-      args.push('--');
-      cmd = [...args, ...cmd];
-      layers.push({ name: 'resource-limits', applied: true, reason: `cgroups v2: mem=${maxMemoryMB || '∞'}MB cpu=${maxCpuPercent || '∞'}%` });
-    }
+  if (caps.hasCgroupsV2 && config.limits && (config.limits.maxMemoryMB || config.limits.maxCpuPercent)) {
+    const args = ['systemd-run', '--user', '--scope', '--quiet'];
+    if (config.limits.maxMemoryMB) args.push('-p', `MemoryMax=${config.limits.maxMemoryMB}M`);
+    if (config.limits.maxCpuPercent) args.push('-p', `CPUQuota=${config.limits.maxCpuPercent}%`);
+    if (config.limits.maxPids) args.push('-p', `TasksMax=${config.limits.maxPids}`);
+    args.push('--');
+    cmd = [...args, ...cmd];
+    applied.push('resource-limits');
   }
 
-  return { command: cmd, layers, cleanupFns };
+  return { command: cmd, applied, failed, cleanupFns };
 }
 
 // ── Windows Isolation ──
@@ -285,37 +203,30 @@ function applyWindowsIsolation(
   command: string[],
   caps: PlatformCapabilities,
   config: ContainerConfig,
-  _containerTmp: string,
-): { command: string[]; layers: ContainerLayer[]; cleanupFns: (() => void)[] } {
-  const layers: ContainerLayer[] = [];
+): { command: string[]; applied: string[]; failed: string[]; cleanupFns: (() => void)[] } {
+  const applied: string[] = [];
+  const failed: string[] = [];
   const cleanupFns: (() => void)[] = [];
   const cmd = [...command];
 
-  // Job Object wrapper for process group + resource limits
-  // NOTE: Start-Process does NOT enforce memory limits. A proper implementation
-  // would require a C# helper compiled at runtime (not yet implemented).
-  if (caps.hasJobObjects && config.limits && config.limits.maxMemoryMB) {
-    layers.push({ name: 'job-object', applied: false, reason: 'Windows Job Object memory limits require C# interop (not yet implemented)' });
+  if (caps.hasJobObjects && config.limits?.maxMemoryMB) {
+    failed.push('job-object');
   }
 
-  // Network isolation via firewall (shared helper from network.ts sanitizes the path)
   if (config.network === 'none' && caps.hasNetsh) {
     const ruleName = `bugbox-${Date.now()}`;
-    const exePath = command[0];
-
-    if (addFirewallBlockRule(ruleName, exePath)) {
-      layers.push({ name: 'network-firewall', applied: true, reason: 'Outbound traffic blocked via netsh' });
+    if (addFirewallBlockRule(ruleName, command[0])) {
+      applied.push('network-firewall');
       cleanupFns.push(() => {
-        spawnSync('netsh', [
-          'advfirewall', 'firewall', 'delete', 'rule', `name=${ruleName}`,
-        ], { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' });
+        spawnSync('netsh', ['advfirewall', 'firewall', 'delete', 'rule', `name=${ruleName}`],
+          { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' });
       });
     } else {
-      layers.push({ name: 'network-firewall', applied: false, reason: 'netsh rule creation failed (may need admin or malicious path rejected)' });
+      failed.push('network-firewall');
     }
   }
 
-  return { command: cmd, layers, cleanupFns };
+  return { command: cmd, applied, failed, cleanupFns };
 }
 
 // ── macOS Isolation ──
@@ -326,38 +237,35 @@ function applyMacIsolation(
   config: ContainerConfig,
   workingDir: string,
   containerTmp: string,
-): { command: string[]; layers: ContainerLayer[] } {
-  const layers: ContainerLayer[] = [];
+): { command: string[]; applied: string[]; failed: string[] } {
+  const applied: string[] = [];
+  const failed: string[] = [];
   let cmd = [...command];
 
   if (caps.hasSandboxExec) {
-    // Build a sandbox profile
     const profileParts = ['(version 1)', '(allow default)'];
 
-    // Deny network if requested
     if (config.network === 'none') {
       profileParts.push('(deny network*)');
-      layers.push({ name: 'network-sandbox', applied: true, reason: 'Network denied via sandbox-exec' });
+      applied.push('network-sandbox');
     }
 
-    // Restrict filesystem writes to working directory and temp
     if (config.filesystem !== 'full') {
       profileParts.push(
         `(deny file-write* (subpath "/"))`,
         `(allow file-write* (subpath "${workingDir}"))`,
         `(allow file-write* (subpath "${containerTmp}"))`
       );
-      layers.push({ name: 'fs-sandbox', applied: true, reason: 'Filesystem writes restricted to workspace and tmp' });
+      applied.push('fs-sandbox');
     }
 
-    const profile = profileParts.join('');
-    cmd = ['sandbox-exec', '-p', profile, '--', ...cmd];
-    layers.push({ name: 'sandbox-exec', applied: true, reason: 'Apple sandbox profile applied' });
+    cmd = ['sandbox-exec', '-p', profileParts.join(''), '--', ...cmd];
+    applied.push('sandbox-exec');
   } else {
-    layers.push({ name: 'sandbox', applied: false, reason: 'sandbox-exec not available' });
+    failed.push('sandbox');
   }
 
-  return { command: cmd, layers };
+  return { command: cmd, applied, failed };
 }
 
 // ── Environment Sanitization ──

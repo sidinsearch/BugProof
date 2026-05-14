@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { RunConfig } from '../types/artifact.js';
 import { FailureRecord } from '../types/failure.js';
 import { generateExactFingerprint, extractErrorPatterns } from '../utils/fingerprint.js';
@@ -73,40 +73,44 @@ export async function executeAndCapture(config: RunConfig): Promise<{ failure: F
       return;
     }
 
-    const killProcessTree = (signal: 'SIGTERM' | 'SIGKILL') => {
-      if (process.platform === 'win32') {
-        // Windows doesn't support process groups through process.kill
-        // Use taskkill to kill the process tree
-        try {
-          if (signal === 'SIGKILL') {
-            spawn('taskkill', ['/pid', proc.pid!.toString(), '/T', '/F'], { stdio: 'ignore' });
-          } else {
-            spawn('taskkill', ['/pid', proc.pid!.toString(), '/T'], { stdio: 'ignore' });
-          }
-        } catch {
-          try { proc.kill(signal); } catch { /* best effort */ }
+    const killProcessTree = (signal: 'SIGTERM' | 'SIGKILL'): boolean => {
+      try {
+        if (process.platform === 'win32') {
+          const isForce = signal === 'SIGKILL';
+          const result = spawnSync('taskkill', [
+            '/pid', proc.pid!.toString(), '/T',
+            ...(isForce ? ['/F'] : []),
+          ], { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' });
+          return result.status === 0;
         }
-      } else {
-        // Linux/macOS: kill process group
-        try {
-          process.kill(-proc.pid!, signal);
-        } catch {
-          try { proc.kill(signal); } catch { /* best effort */ }
-        }
+        process.kill(-proc.pid!, signal);
+        return true;
+      } catch {
+        try { proc.kill(signal); return true; } catch { return false; }
       }
     };
 
+    const waitForExit = (): Promise<boolean> => {
+      return new Promise((resolve) => {
+        const deadline = Date.now() + 3000;
+        const check = setInterval(() => {
+          if (proc.exitCode !== null || proc.killed || Date.now() > deadline) {
+            clearInterval(check);
+            resolve(proc.exitCode !== null || proc.killed);
+          }
+        }, 50);
+      });
+    };
+
     // Set timeout with graceful teardown
-    const timeoutHandle = setTimeout(() => {
+    const timeoutHandle = setTimeout(async () => {
       isTimeout = true;
       killProcessTree('SIGTERM');
-      
-      // Wait 1000ms for graceful cleanup, then send SIGKILL
-      setTimeout(() => {
-        if (!resolved) {
-          killProcessTree('SIGKILL');
-        }
-      }, 1000).unref();
+      const died = await waitForExit();
+      if (!died && !resolved) {
+        killProcessTree('SIGKILL');
+        await waitForExit();
+      }
     }, config.timeout_ms);
 
     if (config.capture_output) {

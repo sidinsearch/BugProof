@@ -27,15 +27,8 @@ describe('BugBox Container', () => {
 
     const result = createContainer(config);
 
-    // Should always have temp isolation
-    const tempLayer = result.layers.find(l => l.name === 'temp-isolation');
-    expect(tempLayer).toBeDefined();
-    expect(tempLayer!.applied).toBe(true);
-
-    // Should have env sanitization
-    const envLayer = result.layers.find(l => l.name === 'env-sanitize');
-    expect(envLayer).toBeDefined();
-    expect(envLayer!.applied).toBe(true);
+    expect(result.layersApplied).toContain('temp-isolation');
+    expect(result.layersApplied).toContain('env-sanitize');
 
     // Cleanup should not throw
     result.cleanup();
@@ -98,9 +91,7 @@ describe('BugBox Container', () => {
 
     const result = createContainer(config);
 
-    const overlayLayer = result.layers.find(l => l.name === 'filesystem-overlay');
-    expect(overlayLayer).toBeDefined();
-    expect(overlayLayer!.applied).toBe(true);
+    expect(result.layersApplied).toContain('filesystem-overlay');
 
     // Working dir should be different from source (overlay or copy)
     // It could be same if overlay falls back to shallow copy in same dir structure
