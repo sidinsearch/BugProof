@@ -36,44 +36,61 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
-
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
 
+    # Cache the global npm install so it's fast on subsequent runs
+    - name: Cache bugproof
+      id: cache-bugproof
+      uses: actions/cache@v4
+      with:
+        path: ~/.nvm/versions/node/*/lib/node_modules/bugproof
+        key: bugproof-${{ runner.os }}-node-${{ inputs.node-version }}-v1
+
     - name: Install bugproof
+      if: steps.cache-bugproof.outputs.cache-hit != 'true'
       shell: bash
       run: npm install -g bugproof
 
+    # Use --json for reliable machine-readable output instead of parsing human text
     - name: Capture command
       id: capture
       shell: bash
+      env:
+        BUGPROOF_COMMAND: ${{ inputs.command }}
+        BUGPROOF_NAME: ${{ inputs.name }}
+        BUGPROOF_TIMEOUT: ${{ inputs.timeout }}
+        BUGPROOF_SKIP_SECRETS: ${{ inputs.skip-secrets }}
       run: |
-        ARGS=""
-        if [ -n "${{ inputs.name }}" ]; then
-          ARGS="$ARGS -n '${{ inputs.name }}'"
+        set -e
+        NAME_ARG=""
+        if [ -n "$BUGPROOF_NAME" ]; then
+          NAME_ARG="-n $BUGPROOF_NAME"
         fi
-        if [ "${{ inputs.skip-secrets }}" = "true" ]; then
-          ARGS="$ARGS --skip-secrets"
+        SECRET_ARG=""
+        if [ "$BUGPROOF_SKIP_SECRETS" = "true" ]; then
+          SECRET_ARG="--skip-secrets"
         fi
-        CAPTURE_OUTPUT=$(bugproof capture $ARGS --timeout ${{ inputs.timeout }} -- ${{ inputs.command }} 2>&1) || true
-        echo "$CAPTURE_OUTPUT"
-        EXTRACTED_PATH=$(echo "$CAPTURE_OUTPUT" | grep -oP "Path\s+\S+\.bug" | awk '{print $NF}')
-        if [ -n "$EXTRACTED_PATH" ] && [ -f "$EXTRACTED_PATH" ]; then
-          echo "artifact-path=$EXTRACTED_PATH" >> $GITHUB_OUTPUT
-        else
-          FOUND_FILE=$(ls -t *.bug 2>/dev/null | head -1)
-          if [ -n "$FOUND_FILE" ]; then
-            echo "artifact-path=$FOUND_FILE" >> $GITHUB_OUTPUT
-          else
-            echo "artifact-path=" >> $GITHUB_OUTPUT
-          fi
-        fi
-        echo "exit-code=$?" >> $GITHUB_OUTPUT
 
+        # --json gives us parseable output; capture both stdout and stderr
+        CAPTURE_OUTPUT=$(bugproof capture $NAME_ARG $SECRET_ARG --timeout $BUGPROOF_TIMEOUT --json -- $BUGPROOF_COMMAND 2>&1) || true
+        echo "$CAPTURE_OUTPUT"
+
+        # Extract artifact path from JSON output
+        ARTIFACT_PATH=$(echo "$CAPTURE_OUTPUT" | grep -oP '"path"\s*:\s*"\K[^"]+' | head -1)
+        if [ -z "$ARTIFACT_PATH" ]; then
+          # Fallback: find the most recent .bug file
+          ARTIFACT_PATH=$(find . -maxdepth 2 -name '*.bug' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
+        fi
+        if [ -z "$ARTIFACT_PATH" ]; then
+          ARTIFACT_PATH=$(ls -t *.bug 2>/dev/null | head -1)
+        fi
+        echo "artifact-path=${ARTIFACT_PATH:-}" >> $GITHUB_OUTPUT
+        echo "exit-code=${PIPESTATUS[0]:-0}" >> $GITHUB_OUTPUT
+
+    # Clean up .bug files from the workspace after upload
     - name: Upload .bug artifact
       if: ${{ inputs.upload-artifact == 'true' && steps.capture.outputs.artifact-path != '' }}
       uses: actions/upload-artifact@v6
@@ -81,3 +98,8 @@ runs:
         name: bugproof-capture-${{ inputs.name || github.sha }}
         path: ${{ steps.capture.outputs.artifact-path }}
         if-no-files-found: warn
+
+    - name: Clean up .bug files
+      if: always()
+      shell: bash
+      run: find . -maxdepth 2 -name '*.bug' -delete 2>/dev/null || true
