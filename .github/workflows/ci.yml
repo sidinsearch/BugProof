@@ -379,6 +379,16 @@ jobs:
           echo "Installing dependencies..."
           npm ci
 
+          # Pull latest main BEFORE modifying any files.
+          # If rebase fails, no version-bump commit/tag exists to orphan.
+          echo "Syncing with remote main..."
+          if ! git pull --rebase origin main; then
+            echo "::error::Rebase conflict during git pull --rebase. Remote has diverged."
+            echo "This usually means multiple release workflows ran concurrently."
+            git rebase --abort
+            exit 1
+          fi
+
           echo "Bumping patch version..."
           npm version patch --no-git-tag-version >/dev/null
           # Read the canonical version from package.json
@@ -390,17 +400,7 @@ jobs:
             jq --arg v "$NEW_VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
           fi
 
-          # Pull latest main BEFORE creating the release commit.
-          # If rebase fails, no commit/tag exists to orphan.
-          echo "Syncing with remote main..."
-          if ! git pull --rebase origin main; then
-            echo "::error::Rebase conflict during git pull --rebase. Remote has diverged."
-            echo "This usually means multiple release workflows ran concurrently."
-            git rebase --abort
-            exit 1
-          fi
-
-          # Now stage and commit — safe because we're on latest main
+          # Stage and commit — safe because we're on latest main
           git add server.json package.json package-lock.json
           git commit -m "Release v${NEW_VERSION}" -m "[skip ci]"
           git tag "${TAG_NAME}"
