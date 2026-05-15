@@ -401,6 +401,17 @@ jobs:
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
 
+          # Pull latest main to incorporate any concurrent pushes (e.g. manual
+          # pushes made while this workflow was already running). Rebase keeps
+          # the release commit linear and avoids non-fast-forward rejections.
+          echo "Syncing with remote main..."
+          if ! git pull --rebase origin main; then
+            echo "::error::Rebase conflict during git pull --rebase. Remote has diverged."
+            echo "This usually means multiple release workflows ran concurrently."
+            git rebase --abort
+            exit 1
+          fi
+
           # Atomic push: commit + tag together. If either fails, neither lands.
           echo "Pushing commit + tag atomically..."
           git push --atomic origin "HEAD:main" "refs/tags/${TAG_NAME}"
