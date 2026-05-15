@@ -9,7 +9,7 @@ import * as crypto from 'crypto';
  *   - Linux:   /home/foo/project/file.js     → <PATH>/file.js
  *   - Node internal: node:internal/...       → left as-is (already portable)
  */
-function stripAbsolutePaths(text: string): string {
+export function stripAbsolutePaths(text: string): string {
   // Windows absolute paths: drive letter + backslash paths
   // e.g. D:\BugProof\bugproof\tests\e2e\fixtures\syntax-error.js → <PATH>/syntax-error.js
   let result = text.replace(/[A-Z]:\\(?:[^\s:()]+\\)*([^\s:()\\]+)/gi, '<PATH>/$1');
@@ -42,11 +42,14 @@ export function generateExactFingerprint(stderr: string): string {
 /**
  * Extracts common error patterns from stderr (e.g., Exception names)
  * This provides the fuzzy fallback for non-deterministic failures (like memory addresses).
+ *
+ * Whitelist approach: only extract patterns matching known error shapes.
+ * Unknown patterns that happen to look like error codes are ignored.
  */
 export function extractErrorPatterns(stderr: string): string[] {
   const patterns: string[] = [];
-  
-  // Look for common exception formats (e.g. "NameError: ...", "Exception in thread ...")
+
+  // 1. Exception names: NameError, TypeError, ReferenceError, etc.
   const exceptionRegex = /([A-Z][a-zA-Z0-9]+Error|Exception):/g;
   let match;
   while ((match = exceptionRegex.exec(stderr)) !== null) {
@@ -55,21 +58,20 @@ export function extractErrorPatterns(stderr: string): string[] {
     }
   }
 
-  // Look for "fatal:" or "error:" standard CLI outputs
+  // 2. Standard CLI error outputs: "fatal: ..." or "error: ..."
   const standardErrorRegex = /(?:fatal|error):\s*(.+)$/im;
   const stdMatch = standardErrorRegex.exec(stderr);
   if (stdMatch && stdMatch[1]) {
     patterns.push(stdMatch[1].trim());
   }
 
-  // Look for Node.js-specific error codes: ERR_MODULE_NOT_FOUND, MODULE_NOT_FOUND, EACCES, EPERM, etc.
-  const errCodeRegex = /\b((?:ERR_)?[A-Z][A-Z0-9_]{3,})\b/g;
+  // 3. Known error code shapes (whitelist only):
+  //    - Node.js: ERR_MODULE_NOT_FOUND, ERR_INVALID_ARG_TYPE
+  //    - POSIX: EACCES, EPERM, ENOENT, EEXIST, etc.
+  //    - Windows: HRESULT-style codes (0x800...)
+  const errCodeRegex = /\b((?:ERR_)[A-Z][A-Z0-9_]{2,}|E[A-Z]{3,}|0x8[0-9A-Fa-f]{7})\b/g;
   while ((match = errCodeRegex.exec(stderr)) !== null) {
     const code = match[1];
-    // Skip common noise words that match the pattern but aren't error codes
-    if (['REQUIRED', 'NODE', 'PATH', 'FILE', 'HOME', 'USER', 'CRASH', 'REPORT',
-         'END', 'APPLICATION', 'VERSION', 'PROCESS', 'PLATFORM',
-         'PID', 'STACK', 'TRACE', 'UNHANDLED'].includes(code)) continue;
     if (!patterns.includes(code)) {
       patterns.push(code);
     }

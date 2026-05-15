@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import { shareToGist, sanitizeShareError } from '../share/gist.js';
-import { banner, info, kvLine, c, icons, Spinner, exitWithError } from '../utils/ui.js';
+import { banner, info, kvLine, c, icons, Spinner, ProgressBar, exitWithError } from '../utils/ui.js';
 
 export const shareCommand = new Command('share')
   .description('Share a .bug artifact via GitHub Gist')
@@ -16,10 +16,18 @@ export const shareCommand = new Command('share')
     }
 
     let spinner: Spinner | undefined;
+    let progress: ProgressBar | undefined;
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
     if (!jsonMode) {
       banner(`${icons.arrow} BugProof Share`);
       spinner = new Spinner('Uploading artifact to GitHub Gist');
       spinner.start();
+      const sizeMB = fs.statSync(artifact).size / (1024 * 1024);
+      progress = new ProgressBar('Upload', Math.max(10, Math.round(sizeMB * 2)));
+      progress.update(0);
+      progressInterval = setInterval(() => {
+        if (progress) progress.step();
+      }, 200);
     }
 
     try {
@@ -32,7 +40,9 @@ export const shareCommand = new Command('share')
           gist_id: result.gistId,
         }, null, 2));
       } else {
+        clearInterval(progressInterval);
         spinner?.stop('Artifact shared!');
+        progress?.complete(`Shared to GitHub Gist`);
         console.log();
         kvLine('URL', c.cyan(result.url));
         kvLine('Gist ID', result.gistId);
@@ -41,6 +51,7 @@ export const shareCommand = new Command('share')
         console.log();
       }
     } catch (err) {
+      clearInterval(progressInterval);
       if (!jsonMode) spinner?.stop(sanitizeShareError(String(err)), true);
       exitWithError(sanitizeShareError(String(err)), { jsonMode });
     }

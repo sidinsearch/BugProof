@@ -7,7 +7,7 @@ import { getGitContext } from '../utils/git.js';
 import { getBugProofVersion } from '../utils/version.js';
 import { formatCaptureJson } from '../utils/json-output.js';
 import { RunConfig } from '../types/artifact.js';
-import { banner, section, success, warn, error, info, kvLine, c, icons } from '../utils/ui.js';
+import { banner, section, warn, error, info, kvIcon, c, icons, summaryBox } from '../utils/ui.js';
 import { detectMissingDependencies } from '../utils/dependencies.js';
 import {
   loadKeyPair,
@@ -247,31 +247,22 @@ export const captureCommand = new Command('capture')
           totalSize: packResult.totalSize,
         }));
       } else {
-        console.log();
-        success(c.bold('Artifact captured!'));
-        if (signerFingerprint) {
-          kvLine('Signed', `${c.green(icons.check)} fingerprint ${c.dim(signerFingerprint)}${options.signer ? ` (${options.signer})` : ''}`);
-        }
-        console.log();
-        kvLine('Path', artifactPath);
-        kvLine('Files', `${packResult.filesCount} files (${(packResult.totalSize / 1024).toFixed(1)} KB)`);
-        kvLine('Exit code', String(result.failure.exit_code));
-        kvLine('Fingerprint', c.dim(result.failure.fingerprint.slice(0, 24) + '...'));
-        if (result.failure.error_patterns.length > 0) {
-          kvLine('Patterns', result.failure.error_patterns.join(', '));
-        }
-        if (options.exclude.length > 0) {
-          kvLine('Excluded', options.exclude.join(', '));
-        }
+        summaryBox('Artifact Captured', [
+          { label: 'Path', value: artifactPath, highlight: true },
+          { label: 'Files', value: `${packResult.filesCount} files (${(packResult.totalSize / 1024).toFixed(1)} KB)` },
+          { label: 'Exit code', value: String(result.failure.exit_code) },
+          { label: 'Fingerprint', value: c.dim(result.failure.fingerprint.slice(0, 24) + '...') },
+          ...(signerFingerprint ? [{ label: 'Signed', value: `${c.green(icons.check)} fingerprint ${c.dim(signerFingerprint)}${options.signer ? ` (${options.signer})` : ''}` }] : []),
+          ...(result.failure.error_patterns.length > 0 ? [{ label: 'Patterns', value: result.failure.error_patterns.join(', ') }] : []),
+          ...(options.exclude.length > 0 ? [{ label: 'Excluded', value: options.exclude.join(', ') }] : []),
+        ]);
 
         // Detect and show missing dependencies
         const deps = detectMissingDependencies(result.stderr);
         if (deps.length > 0) {
-          console.log();
           section('Missing Dependencies');
           for (const dep of deps) {
-            console.log(`    ${c.yellow(icons.arrow)} ${c.bold(dep.name)} (${dep.language})`);
-            console.log(`      ${c.dim(dep.installCommand)}`);
+            kvIcon(c.yellow(icons.arrow), c.bold(dep.name), `${c.dim(dep.language)} — ${c.dim(dep.installCommand)}`);
           }
         }
 

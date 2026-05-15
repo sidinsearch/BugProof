@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import { extractArtifactIfNeeded, ExtractedArtifact } from '../utils/archive.js';
-import { banner, section, info, kvLine, c, icons, exitWithError } from '../utils/ui.js';
+import { banner, section, info, kvLine, c, icons, table, exitWithError } from '../utils/ui.js';
 import { formatInspectJson } from '../utils/json-output.js';
 import {
   secureJsonParse,
@@ -97,10 +97,11 @@ export const inspectCommand = new Command('inspect')
       if (files.length > 0) {
         section(`Files (${files.length} captured)`);
         const shown = files.slice(0, 15);
-        for (const f of shown) {
-          const sizeKB = (f.size / 1024).toFixed(1);
-          console.log(`    ${c.dim(sizeKB.padStart(8) + ' KB')}  ${f.path}`);
-        }
+        const rows = shown.map((f: { path: string; size: number }) => [
+          c.dim((f.size / 1024).toFixed(1) + ' KB'),
+          f.path,
+        ]);
+        table(['Size', 'File'], rows);
         if (files.length > 15) {
           console.log(c.dim(`    ... and ${files.length - 15} more`));
         }

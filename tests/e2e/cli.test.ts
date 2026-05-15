@@ -107,7 +107,7 @@ describe('CLI end-to-end', () => {
   it('capture should create a .bug artifact from a failing command', () => {
     const r = run('capture --skip-secrets -n e2e-fail -- node fail.js', projectDir);
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain('Artifact captured');
+    expect(r.stdout).toContain('Artifact Captured');
     expect(fs.existsSync(path.join(projectDir, 'e2e-fail.bug'))).toBe(true);
   });
 
@@ -122,7 +122,7 @@ describe('CLI end-to-end', () => {
   it('capture should work for a passing command (exit 0)', () => {
     const r = run('capture --skip-secrets -n e2e-pass -- node pass.js', projectDir);
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain('Artifact captured');
+    expect(r.stdout).toContain('Artifact Captured');
     expect(r.stdout).toContain('exit 0');
   });
 
@@ -262,7 +262,7 @@ describe('CLI end-to-end', () => {
     try {
       const r = run('capture --skip-secrets -n no-git-test -- node crash.js', noGitDir);
       expect(r.status).toBe(0);
-      expect(r.stdout).toContain('Artifact captured');
+      expect(r.stdout).toContain('Artifact Captured');
       expect(r.stdout).toContain('1 files');
     } finally {
       fs.rmSync(noGitDir, { recursive: true, force: true });

@@ -388,22 +388,10 @@ jobs:
           # Sync server.json version to match (prevents test failure on next push)
           if [ -f server.json ]; then
             jq --arg v "$NEW_VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
-            git add server.json
           fi
 
-          # Also stage the npm-versioned files
-          git add package.json package-lock.json
-
-          # Create the release commit with [skip ci]
-          git commit -m "Release v${NEW_VERSION}" -m "[skip ci]"
-          git tag "${TAG_NAME}"
-
-          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
-
-          # Pull latest main to incorporate any concurrent pushes (e.g. manual
-          # pushes made while this workflow was already running). Rebase keeps
-          # the release commit linear and avoids non-fast-forward rejections.
+          # Pull latest main BEFORE creating the release commit.
+          # If rebase fails, no commit/tag exists to orphan.
           echo "Syncing with remote main..."
           if ! git pull --rebase origin main; then
             echo "::error::Rebase conflict during git pull --rebase. Remote has diverged."
@@ -411,6 +399,14 @@ jobs:
             git rebase --abort
             exit 1
           fi
+
+          # Now stage and commit — safe because we're on latest main
+          git add server.json package.json package-lock.json
+          git commit -m "Release v${NEW_VERSION}" -m "[skip ci]"
+          git tag "${TAG_NAME}"
+
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
 
           # Atomic push: commit + tag together. If either fails, neither lands.
           echo "Pushing commit + tag atomically..."

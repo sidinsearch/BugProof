@@ -5,7 +5,7 @@ import * as path from 'path';
 import { extractZip } from '../utils/archive.js';
 import { replayArtifact } from '../replay/engine.js';
 import { generateVerdict } from '../replay/verdict.js';
-import { banner, section, success, warn, error, info, kvLine, c, icons, Spinner } from '../utils/ui.js';
+import { banner, section, success, warn, error, info, kvLine, c, icons, Spinner, summaryBox } from '../utils/ui.js';
 import { generateHints } from '../replay/hints.js';
 import { selfHealReplay } from '../replay/self-heal.js';
 import { captureEnvSnapshot, compareEnvSnapshots, EnvSnapshot } from '../capture/env-snapshot.js';
@@ -293,19 +293,17 @@ export const replayCommand = new Command('replay')
         } else {
           error(c.bold(c.red('NOT REPRODUCED')));
         }
-        console.log();
-        kvLine('Expected exit', String(expectedFailure.exit_code));
-        kvLine('Actual exit', String(replayResult.actualFailure.exit_code));
-        kvLine('Verdict', verdict.message);
-        
-        if (replayResult.bugBox && replayResult.bugBox.level !== 'workspace') {
-          section('Bug-Box Sandbox');
-          kvLine('Level', replayResult.bugBox.level);
-          kvLine('Applied', replayResult.bugBox.appliedLayers.join(', ') || 'none');
-          if (replayResult.bugBox.skippedLayers.length > 0) {
-            kvLine('Skipped', c.yellow(replayResult.bugBox.skippedLayers[0] + (replayResult.bugBox.skippedLayers.length > 1 ? '...' : '')));
-          }
-        }
+
+        summaryBox('Replay Verdict', [
+          { label: 'Expected exit', value: String(expectedFailure.exit_code) },
+          { label: 'Actual exit', value: String(replayResult.actualFailure.exit_code) },
+          { label: 'Verdict', value: verdict.message, highlight: verdict.status === 'confirmed' },
+          ...(replayResult.bugBox && replayResult.bugBox.level !== 'workspace' ? [
+            { label: 'Sandbox level', value: replayResult.bugBox.level },
+            { label: 'Applied', value: replayResult.bugBox.appliedLayers.join(', ') || 'none' },
+            ...(replayResult.bugBox.skippedLayers.length > 0 ? [{ label: 'Skipped', value: c.yellow(replayResult.bugBox.skippedLayers[0] + (replayResult.bugBox.skippedLayers.length > 1 ? '...' : '')) }] : []),
+          ] : []),
+        ]);
 
         // Check if this artifact was captured in stacktrace-only mode (no source files)
         const sourceStrategyPath = path.join(targetPath, 'source-strategy.json');

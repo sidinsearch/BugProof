@@ -13,7 +13,6 @@ const SECRET_PATTERNS = [
   /aws_secret_access_key/i,
   /github_token/i,
   /stripe_sk_/i,
-  /^[A-Z0-9]{20,128}$/,
   // GitLab personal/project access tokens
   /glpat-[A-Za-z0-9\-_]{20,}/,
   // GCP API keys (AIza + 35 alphanum/underscore/dash chars)

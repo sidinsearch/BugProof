@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { extractArtifactIfNeeded, ExtractedArtifact } from '../utils/archive.js';
 import { diffArtifacts, ArtifactSnapshot } from '../diff/engine.js';
-import { banner, section, success, info, kvLine, c, exitWithError } from '../utils/ui.js';
+import { banner, section, success, info, kvLine, c, table, exitWithError } from '../utils/ui.js';
 import {
   secureJsonParse,
   validateArtifactManifest,
@@ -87,15 +87,17 @@ export const diffCommand = new Command('diff')
       const hasChanges = fc.added.length > 0 || fc.removed.length > 0 || fc.modified.length > 0;
       if (hasChanges) {
         section('File Changes');
+        const rows: string[][] = [];
         for (const f of fc.added) {
-          console.log(`    ${c.green('+ ' + f)}`);
+          rows.push([c.green('+ ' + f), c.dim('added')]);
         }
         for (const f of fc.removed) {
-          console.log(`    ${c.red('- ' + f)}`);
+          rows.push([c.red('- ' + f), c.dim('removed')]);
         }
         for (const f of fc.modified) {
-          console.log(`    ${c.yellow('~ ' + f)}`);
+          rows.push([c.yellow('~ ' + f), c.dim('modified')]);
         }
+        table(['File', 'Change'], rows);
         console.log();
       }
     }

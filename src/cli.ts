@@ -15,6 +15,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { keygenCommand } from './commands/keygen.js';
 import { verifyCommand } from './commands/verify.js';
 import { mcpCommand } from './commands/mcp.js';
+import { helpBanner, ASCII_LOGO, COMPACT_LOGO } from './utils/ui.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
@@ -33,7 +34,15 @@ const program = new Command();
 program
   .name('bugproof')
   .description('Executable bug artifacts \u2014 portable, reproducible bug reports')
-  .version(VERSION);
+  .version(VERSION)
+  .addHelpText('beforeAll', () => {
+    helpBanner();
+    return '';
+  });
+
+// Expose ASCII_LOGO and COMPACT_LOGO for external use (MCP server info, etc.)
+void ASCII_LOGO;
+void COMPACT_LOGO;
 
 program.showHelpAfterError();
 program.showSuggestionAfterError();

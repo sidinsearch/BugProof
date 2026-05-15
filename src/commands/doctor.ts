@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as os from 'os';
 import { detectCapabilities } from '../sandbox/capabilities.js';
-import { banner, section, warn, kvLine, icons, statusBadge } from '../utils/ui.js';
+import { banner, section, warn, kvLine, icons, statusRow } from '../utils/ui.js';
 
 export const doctorCommand = new Command('doctor')
   .description('Verify host OS support for sandboxing and features')
@@ -34,16 +34,16 @@ export const doctorCommand = new Command('doctor')
 
     section('Sandbox Capabilities');
     if (caps.platform === 'linux') {
-      statusBadge('Linux unshare (Namespaces)', caps.hasUnshare);
-      statusBadge('cgroups v2 (Resource Limits)', caps.hasCgroupsV2);
+      statusRow('Linux unshare (Namespaces)', caps.hasUnshare ? 'ok' : 'fail');
+      statusRow('cgroups v2 (Resource Limits)', caps.hasCgroupsV2 ? 'ok' : 'fail');
       if (!caps.hasUnshare) {
         warn('Missing unshare. BugProof will run without namespace isolation.');
       }
     } else if (caps.platform === 'win32') {
-      statusBadge('Job Objects (Process Isolation)', caps.hasJobObjects);
-      statusBadge('netsh (Network Firewall)', caps.hasNetsh);
+      statusRow('Job Objects (Process Isolation)', caps.hasJobObjects ? 'ok' : 'warn', 'Best-effort on Windows');
+      statusRow('netsh (Network Firewall)', caps.hasNetsh ? 'ok' : 'fail');
     } else if (caps.platform === 'darwin') {
-      statusBadge('sandbox-exec (Apple Seatbelt)', caps.hasSandboxExec);
+      statusRow('sandbox-exec (Apple Seatbelt)', caps.hasSandboxExec ? 'ok' : 'fail');
       if (!caps.hasSandboxExec) {
         warn('Missing sandbox-exec. macOS sandbox profile isolation will be disabled.');
       }
