@@ -13,11 +13,16 @@
     {
       "src": "https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png",
       "mimeType": "image/png",
-      "sizes": [
-        "512x512"
-      ],
+      "sizes": ["512x512"],
       "theme": "dark"
     }
+  ],
+  "tools": [
+    { "name": "capture", "description": "Run a command and capture its output as a .bug artifact" },
+    { "name": "replay", "description": "Replay a .bug file and return the reproduction verdict" },
+    { "name": "inspect", "description": "Show metadata for a .bug artifact without replaying" },
+    { "name": "diff", "description": "Compare two .bug artifacts to find differences" },
+    { "name": "doctor", "description": "Check if bugproof sandbox capabilities are available" }
   ],
   "packages": [
     {
