@@ -119,7 +119,9 @@ TROUBLESHOOTING.md
 # --------------------------------------------------------------------
 dummy-project/
 dummy-testing/
+generated files/
 *.bin
+skills-lock.json
 
 # --------------------------------------------------------------------
 # 7. OS & IDE
