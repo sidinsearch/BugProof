@@ -21,7 +21,7 @@ git clone https://github.com/sidinsearch/BugProof.git
 cd BugProof
 npm install
 npm run build
-npm test        # should say 38 suites, 361 tests, all passing
+npm test        # should say 40 suites, 483 tests, all passing
 ```
 
 ---
@@ -56,7 +56,7 @@ scripts/
 
 ```bash
 npm run build          # compile TypeScript → dist/
-npm test               # build + run all 38 Jest suites
+npm test               # build + run all 40 Jest suites
 npm run lint           # ESLint (strict TypeScript, no-any)
 npm run test:watch     # Jest watch mode during development
 npm run test:coverage  # coverage report
@@ -128,7 +128,7 @@ Before opening a PR, verify:
 
 - [ ] `npm run build` passes with no TypeScript errors
 - [ ] `npm run lint` passes with no ESLint errors or warnings
-- [ ] `npm test` passes — all 38+ suites green
+- [ ] `npm test` passes — all 40+ suites green
 - [ ] New behaviour is covered by tests
 - [ ] README.md updated if the user-facing interface changed
 - [ ] CHANGELOG.md updated with a brief description of the change

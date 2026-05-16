@@ -7,6 +7,45 @@ and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.1.26] - 2026-05-16 (Comprehensive Validation Release)
+
+### Added
+
+- **`-o/--output` flag on capture** — specify output directory for `.bug` artifacts.
+- **`.bugproofrc` config support** — `outputDir` and `nameTemplate` fields control artifact naming and location.
+- **`--source-dir` flag on replay** — override source directory for replay execution.
+- **Cross-platform translation layer** — automatic PATH separator, path normalization, and command translation (`python` ↔ `python3`) for Win↔Linux replays.
+- **`fallbackReason` and `sourceType` fields** in replay results for better diagnostics.
+- **Current-dir git detection fallback** — replay engine now detects git repo in current directory when artifact source is missing.
+- **AI Agent Skill** — distributable skill package for OpenCode, Claude, Cursor, and OpenClaw agents.
+- **MCP server** — 5 tools (`capture`, `replay`, `inspect`, `diff`, `doctor`) with full JSON-RPC support.
+
+### Fixed
+
+- Removed unused `mapToReplayEnvironment` import from `src/replay/sandbox.ts` (lint warning).
+- Replay isolation: current directory is never read for source files; sandbox always uses git worktree/clone or artifact's bundled `files/`.
+- Artifact path normalization for cross-platform compatibility.
+
+### Verified
+
+- 70/70 validation tests passed across Windows 11 + Ubuntu 22.04
+- All 4 cross-platform capture→replay combinations confirmed (Win→Win, Win→Linux, Linux→Win, Linux→Linux)
+- MCP server: all 5 tools functional
+- Stress tested: 102 files, parallel captures, repeated replays
+- Failure injection: 7 scenarios handled gracefully
+- 40 test suites, 483 tests, 0 failures
+
+---
+
+## [1.1.25] - 2026-05-16 (Capture Output Control)
+
+### Added
+
+- **`-o/--output` flag** — control where `.bug` artifacts are saved.
+- **`.bugproofrc` configuration** — `outputDir` and `nameTemplate` for persistent capture settings.
+
+---
+
 ## [1.1.12] - 2026-05-12 (Cross-Platform Validation Complete)
 
 ### Added
