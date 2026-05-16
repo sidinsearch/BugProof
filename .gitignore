@@ -52,6 +52,7 @@ docs/
 .opencode/
 .vscode/
 .windsurf/
+skills-lock.json
 
 # --------------------------------------------------------------------
 # 4. Auto-generated Product & Agent Docs (NOT CHANGELOG or CONTRIBUTING)
@@ -121,7 +122,6 @@ dummy-project/
 dummy-testing/
 generated files/
 *.bin
-skills-lock.json
 
 # --------------------------------------------------------------------
 # 7. OS & IDE
