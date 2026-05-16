@@ -23,16 +23,19 @@ bugproof capture [options] -- <command> [args...]
 
 | Flag | Description |
 |------|-------------|
-| `-n, --name <name>` | Name for the artifact (required) |
+| `-n, --name <name>` | Name for the artifact (default: `bug_<timestamp>`) |
+| `-o, --output <dir>` | Output directory (default: current directory; respects `.bugproofrc` `outputDir`) |
+| `-d, --description <desc>` | Description of the bug being captured |
 | `--skip-secrets` | Skip secrets detection |
+| `--include-untracked` | Include untracked git files |
 | `--include <pattern>` | Include files matching glob pattern |
 | `--exclude <pattern>` | Exclude files matching glob pattern |
 | `--env-file <path>` | Include specific environment file |
+| `--timeout <ms>` | Command timeout in milliseconds (default: 300000) |
 | `--json` | Output in JSON format |
-| `--output <path>` | Output path for the artifact |
-| `--no-git` | Don't capture git state |
-| `--no-env` | Don't capture environment variables |
-| `--no-files` | Don't capture file system state |
+| `--container` | Run in BugBox container isolation |
+| `--sign [key]` | Sign artifact with Ed25519 key |
+| `--signer <identity>` | Embed signer identity |
 
 ### Examples
 
@@ -66,10 +69,15 @@ bugproof replay [options] <file.bug>
 
 | Flag | Description |
 |------|-------------|
+| `--version-match <mode>` | Git checkout mode: `strict`, `current`, `branch` (default: `current`) |
+| `--sandbox <level>` | Sandbox level: `workspace`, `isolated`, `full` (default: `workspace`) |
+| `--container` | Use BugBox container isolation |
+| `--env <var=value>` | Override environment variables (repeatable) |
+| `--source-dir <dir>` | Override source directory for git operations (use current dir's repo) |
+| `--self-heal` | Auto-install missing npm/pip dependencies and retry |
+| `--verify-signature` | Require valid Ed25519 signature |
+| `--replay-count <n>` | Number of retry attempts for flaky bugs (default: 1) |
 | `--json` | Output in JSON format |
-| `--verbose` | Show detailed replay information |
-| `--no-sandbox` | Run without sandbox isolation |
-| `--timeout <ms>` | Set replay timeout in milliseconds |
 
 ### Verdicts
 

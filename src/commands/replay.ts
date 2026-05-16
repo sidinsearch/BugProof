@@ -40,6 +40,7 @@ export const replayCommand = new Command('replay')
   .option('--replay-count <n>', 'Number of times to retry replay for flaky bugs', '1')
   .option('--self-heal', 'Auto-install missing npm/pip dependencies and retry on failure')
   .option('--verify-signature', 'Require a valid Ed25519 signature; exit non-zero if missing or invalid')
+  .option('--source-dir <dir>', 'Override source directory for git operations (use current dir\'s repo instead of captured path)')
   .action(async (artifact: string, options) => {
     const jsonMode = options.json === true;
 
@@ -211,6 +212,7 @@ export const replayCommand = new Command('replay')
         gitBranch: manifest.captured_on.git_branch,
         capturedPlatform: manifest.captured_on.os,
         capturedArch: manifest.captured_on.arch,
+        sourceDir: options.sourceDir,
       };
 
       if (options.selfHeal) {
@@ -298,6 +300,8 @@ export const replayCommand = new Command('replay')
           { label: 'Expected exit', value: String(expectedFailure.exit_code) },
           { label: 'Actual exit', value: String(replayResult.actualFailure.exit_code) },
           { label: 'Verdict', value: verdict.message, highlight: verdict.status === 'confirmed' },
+          ...(replayResult.sourceType ? [{ label: 'Source', value: replayResult.sourceType }] : []),
+          ...(replayResult.fallbackReason ? [{ label: 'Note', value: c.yellow(replayResult.fallbackReason) }] : []),
           ...(replayResult.bugBox && replayResult.bugBox.level !== 'workspace' ? [
             { label: 'Sandbox level', value: replayResult.bugBox.level },
             { label: 'Applied', value: replayResult.bugBox.appliedLayers.join(', ') || 'none' },

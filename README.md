@@ -340,6 +340,7 @@ Run a command end-to-end and bundle the failure as `<name>.bug`.
 ```bash
 bugproof capture -- npm test
 bugproof capture -n auth-crash -d "Login fails on expired session" -- node server.js
+bugproof capture -o ./bugs/ -- npm test
 bugproof capture --include-untracked -- python app.py
 bugproof capture -x "*.log" -x "node_modules/**" -- go test ./...
 bugproof capture --timeout 600000 -- java -cp . Main
@@ -351,6 +352,7 @@ bugproof capture --json -- node script.js
 |---|---|
 | `-n, --name <name>` | Artifact name (becomes `<name>.bug`) |
 | `-d, --description <desc>` | Human-readable description embedded in the manifest |
+| `-o, --output <dir>` | Output directory (default: current directory; respects `.bugproofrc` `outputDir`) |
 | `-x, --exclude <pattern>` | Exclude files by glob (repeatable) |
 | `--include-untracked` | Bundle untracked files too (`git ls-files -o`) |
 | `--timeout <ms>` | Kill the command after N ms (default 300000) |
@@ -358,6 +360,8 @@ bugproof capture --json -- node script.js
 | `--sign [key]` | Sign with the default key, or a named key / path to a `.key` file |
 | `--signer <id>` | Embed a signer identity (email, gist URL, etc.) |
 | `--json` | Structured JSON output |
+
+**Default behavior:** Without `-n`, artifacts are named `bug_<timestamp>.bug`. With `.bugproofrc` `nameTemplate` configured, the template is used instead. Without `-o`, artifacts are saved in the current directory.
 
 ---
 
@@ -370,6 +374,7 @@ bugproof replay bug.bug
 bugproof replay bug.bug --sandbox isolated
 bugproof replay bug.bug --self-heal
 bugproof replay bug.bug --verify-signature
+bugproof replay bug.bug --source-dir .
 bugproof replay bug.bug --json
 ```
 
@@ -378,7 +383,10 @@ bugproof replay bug.bug --json
 | `--sandbox <level>` | `workspace` (default), `isolated`, or `full` |
 | `--self-heal` | Auto-install missing npm/pip deps and retry (up to 3 rounds) |
 | `--verify-signature` | Require a valid Ed25519 signature; exit 2 if missing or invalid |
+| `--source-dir <dir>` | Override source directory for git operations (use current dir's repo instead of captured path) |
 | `--json` | Structured JSON output |
+
+**Replay isolation:** Replay always runs in an isolated temp directory. Files come from either: (1) git worktree/clone at the captured commit, (2) current directory's git repo (if original path is inaccessible), or (3) the artifact's bundled `files/` snapshot. The current directory is never read for source files.
 
 ---
 

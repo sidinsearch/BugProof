@@ -12,6 +12,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { spawnSync } from 'child_process';
 import { isValidGitRef } from '../utils/security.js';
+import { mapToReplayEnvironment, normalizeArtifactPath } from '../utils/paths.js';
 
 export interface SandboxOptions {
   mode: 'current' | 'strict' | 'branch';
@@ -21,6 +22,8 @@ export interface SandboxOptions {
   gitBranch?: string;
   /** Optional pre-created directory to place the sandbox into */
   targetDir?: string;
+  /** Override source directory — use current dir's git repo instead of captured path */
+  sourceDir?: string;
 }
 
 export interface SandboxResult {
@@ -29,6 +32,10 @@ export interface SandboxResult {
   needsCleanup: boolean;
   /** True when git checkout failed and we fell back to the artifact's files/ snapshot */
   usedFallback?: boolean;
+  /** Reason for fallback (for user messaging) */
+  fallbackReason?: string;
+  /** Source of files: 'git-worktree' | 'git-clone' | 'artifact-files' | 'original-path' */
+  sourceType?: string;
 }
 
 /**
@@ -47,12 +54,17 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
         tempDir,
         needsCleanup: true,
         usedFallback: true,
+        fallbackReason: 'current mode — using artifact files',
+        sourceType: 'artifact-files',
       };
     }
 
     return {
       workingDirectory: options.originalWorkingDir,
       needsCleanup: false,
+      usedFallback: true,
+      fallbackReason: 'current mode — no artifact files, using original path',
+      sourceType: 'original-path',
     };
   }
 
@@ -61,6 +73,9 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
     return {
       workingDirectory: options.originalWorkingDir,
       needsCleanup: false,
+      usedFallback: true,
+      fallbackReason: 'branch mode — no branch info in artifact',
+      sourceType: 'original-path',
     };
   }
 
@@ -70,31 +85,69 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
   // Determine the ref to checkout
   const ref = options.mode === 'strict' ? options.gitCommit : options.gitBranch;
 
+  // If sourceDir is provided, use it instead of originalWorkingDir
+  const repoDir = options.sourceDir || options.originalWorkingDir;
+
   if (ref) {
     // Security: validate ref before passing to git
     if (!isValidGitRef(ref)) {
       // Invalid ref, skip directly to fallback
     } else {
-      const worktreeResult = tryGitWorktree(options.originalWorkingDir, tempDir, ref);
+      const worktreeResult = tryGitWorktree(repoDir, tempDir, ref);
 
       if (worktreeResult.success) {
         return {
           workingDirectory: tempDir,
           tempDir,
           needsCleanup: true,
+          sourceType: 'git-worktree',
         };
       }
 
       // Worktree failed. For strict mode, try a detached checkout clone.
       if (options.mode === 'strict') {
-        const cloneResult = tryGitCloneAndCheckout(options.originalWorkingDir, tempDir, ref);
+        const cloneResult = tryGitCloneAndCheckout(repoDir, tempDir, ref);
         if (cloneResult.success) {
           return {
             workingDirectory: tempDir,
             tempDir,
             needsCleanup: true,
+            sourceType: 'git-clone',
           };
         }
+      }
+    }
+  }
+
+  // ── Fallback: current-dir git detection ──
+  // If original path is inaccessible, check if current directory is the same repo
+  // and try to use it for git operations
+  if (!fs.existsSync(repoDir) || !isGitRepo(repoDir)) {
+    const currentDirRepo = findGitRoot(process.cwd());
+    if (currentDirRepo && currentDirRepo !== repoDir && ref) {
+      // Current directory is a different git repo — try it
+      const currentWorktree = tryGitWorktree(currentDirRepo, tempDir, ref);
+      if (currentWorktree.success) {
+        return {
+          workingDirectory: tempDir,
+          tempDir,
+          needsCleanup: true,
+          usedFallback: true,
+          fallbackReason: `original path inaccessible — using current directory's git repo`,
+          sourceType: 'git-worktree',
+        };
+      }
+
+      const currentClone = tryGitCloneAndCheckout(currentDirRepo, tempDir, ref);
+      if (currentClone.success) {
+        return {
+          workingDirectory: tempDir,
+          tempDir,
+          needsCleanup: true,
+          usedFallback: true,
+          fallbackReason: `original path inaccessible — cloned from current directory's git repo`,
+          sourceType: 'git-clone',
+        };
       }
     }
   }
@@ -108,6 +161,8 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
       tempDir,
       needsCleanup: true,
       usedFallback: true,
+      fallbackReason: `git operations failed${!fs.existsSync(repoDir) ? ` (original path: ${normalizeArtifactPath(repoDir)} not found)` : ''} — using artifact files`,
+      sourceType: 'artifact-files',
     };
   }
 
@@ -119,6 +174,8 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
     workingDirectory: options.originalWorkingDir,
     needsCleanup: false,
     usedFallback: true,
+    fallbackReason: `no git access and no artifact files — original path: ${normalizeArtifactPath(options.originalWorkingDir)}`,
+    sourceType: 'original-path',
   };
 }
 
@@ -254,4 +311,30 @@ function copyDirRecursive(src: string, dest: string): void {
       fs.copyFileSync(srcPath, destPath);
     }
   }
+}
+
+/**
+ * Check if a directory is a git repository.
+ */
+function isGitRepo(dir: string): boolean {
+  const result = spawnSync('git', ['rev-parse', '--git-dir'], {
+    cwd: dir,
+    encoding: 'utf-8',
+    timeout: 5000,
+  });
+  return result.status === 0;
+}
+
+/**
+ * Find the git root by walking up from the given directory.
+ * Returns null if not inside a git repo.
+ */
+function findGitRoot(startDir: string): string | null {
+  const result = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    cwd: startDir,
+    encoding: 'utf-8',
+    timeout: 5000,
+  });
+  if (result.status !== 0) return null;
+  return result.stdout.trim();
 }

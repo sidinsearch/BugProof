@@ -18,6 +18,8 @@ export interface ReplayOptions {
   capturedPlatform?: string;
   /** Architecture the artifact was captured on */
   capturedArch?: string;
+  /** Override source directory for git operations — use current dir's repo instead of captured path */
+  sourceDir?: string;
 }
 
 export interface ReplayResult {
@@ -29,6 +31,10 @@ export interface ReplayResult {
   replayDirectory: string;
   /** Whether the sandbox fell back to artifact file snapshots */
   usedFallback?: boolean;
+  /** Reason for fallback (for user messaging) */
+  fallbackReason?: string;
+  /** Source of files used for replay */
+  sourceType?: string;
   /** Sandbox architecture layers applied */
   bugBox?: {
     level: string;
@@ -70,6 +76,7 @@ export async function replayArtifact(
       artifactPath: options.artifactPath,
       gitCommit: options.gitCommit,
       gitBranch: options.gitBranch,
+      sourceDir: options.sourceDir,
     },
   });
 
@@ -130,6 +137,8 @@ export async function replayArtifact(
       actualStderr: result.stderr,
       replayDirectory: bugbox.sandboxResult.workingDirectory,
       usedFallback: bugbox.sandboxResult.usedFallback,
+      fallbackReason: bugbox.sandboxResult.fallbackReason,
+      sourceType: bugbox.sandboxResult.sourceType,
       bugBox: {
         level: options.sandboxLevel || 'workspace',
         appliedLayers: bugbox.appliedLayers,

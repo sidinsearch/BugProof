@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import * as path from 'path';
+import * as fs from 'fs';
 import { executeAndCapture } from '../capture/engine.js';
 import { packageArtifact, buildCaptureManifest, buildCaptureMetadata } from '../capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from '../utils/secrets.js';
@@ -19,6 +20,7 @@ import { determineSourceStrategy } from '../capture/source-strategy.js';
 import { captureEnvSnapshot } from '../capture/env-snapshot.js';
 import { detectProjectLanguages } from '../capture/language-support.js';
 import { createContainer } from '../sandbox/container.js';
+import { loadConfig, applyNameTemplate } from '../config/loader.js';
 
 const VERSION = getBugProofVersion();
 
@@ -30,6 +32,7 @@ export const captureCommand = new Command('capture')
   .option('--timeout <ms>', 'Command timeout in milliseconds', '300000')
   .option('-n, --name <name>', 'Human-readable name for the artifact')
   .option('-d, --description <desc>', 'Description of the bug being captured')
+  .option('-o, --output <dir>', 'Output directory for the artifact (default: current directory)')
   .option('-x, --exclude <pattern>', 'Exclude files matching glob pattern (repeatable)', (v: string, arr: string[]) => {
     arr.push(v);
     return arr;
@@ -51,6 +54,14 @@ export const captureCommand = new Command('capture')
       }
       process.exit(1);
     }
+
+    // Load .bugproofrc config
+    const config = loadConfig(process.cwd());
+
+    // Resolve output directory: flag > config.outputDir > current directory
+    const outputDir = options.output
+      ? path.resolve(options.output)
+      : path.resolve(config.outputDir);
 
     if (!jsonMode) banner(`${icons.bug} BugProof Capture`);
 
@@ -141,9 +152,20 @@ export const captureCommand = new Command('capture')
     // 4. Build manifest and metadata
     const envSchema = buildEnvironmentSchema(process.env, secrets.detectedKeys);
 
-    const artifactName = options.name
-      ? options.name.replace(/[^a-zA-Z0-9_-]/g, '_')
-      : `bug_${Date.now()}`;
+    // Resolve artifact name: flag > config nameTemplate > default
+    let artifactName: string;
+    if (options.name) {
+      artifactName = options.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    } else if (config.nameTemplate && config.nameTemplate !== 'bug_{timestamp}') {
+      // Use config template if it's customized
+      artifactName = applyNameTemplate(config.nameTemplate, {
+        timestamp: Date.now(),
+        command: commandTokens[0] || 'unknown',
+        exit_code: result.failure.exit_code,
+      }).replace(/[^a-zA-Z0-9_-]/g, '_');
+    } else {
+      artifactName = `bug_${Date.now()}`;
+    }
 
     const manifest = buildCaptureManifest({
       name: artifactName,
@@ -194,7 +216,11 @@ export const captureCommand = new Command('capture')
     }
 
     // 6. Package artifact
-    const artifactPath = path.join(process.cwd(), `${artifactName}.bug`);
+    // Ensure output directory exists
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const artifactPath = path.join(outputDir, `${artifactName}.bug`);
     if (!jsonMode) {
       info('Packaging artifact...');
     }
@@ -255,6 +281,7 @@ export const captureCommand = new Command('capture')
           ...(signerFingerprint ? [{ label: 'Signed', value: `${c.green(icons.check)} fingerprint ${c.dim(signerFingerprint)}${options.signer ? ` (${options.signer})` : ''}` }] : []),
           ...(result.failure.error_patterns.length > 0 ? [{ label: 'Patterns', value: result.failure.error_patterns.join(', ') }] : []),
           ...(options.exclude.length > 0 ? [{ label: 'Excluded', value: options.exclude.join(', ') }] : []),
+          ...(outputDir !== process.cwd() ? [{ label: 'Output dir', value: outputDir }] : []),
         ]);
 
         // Detect and show missing dependencies
@@ -268,6 +295,9 @@ export const captureCommand = new Command('capture')
 
         console.log();
         info(`Replay with: ${c.cyan(`bugproof replay ${artifactName}.bug`)}`);
+        if (outputDir !== process.cwd()) {
+          info(`Output directory set via ${options.output ? '-o flag' : '.bugproofrc outputDir'}`);
+        }
         console.log();
       }
     } catch (err) {

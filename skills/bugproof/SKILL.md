@@ -57,12 +57,21 @@ bugproof capture -n my-bug -- <failing-command>
 
 | Flag | Purpose |
 |------|---------|
-| `-n <name>` | Artifact name (required) |
+| `-n <name>` | Artifact name (default: `bug_<timestamp>`) |
+| `-o <dir>` | Output directory (default: current directory; respects `.bugproofrc` `outputDir`) |
 | `--skip-secrets` | Skip secrets detection (faster) |
 | `--include <pattern>` | Include files (glob pattern) |
 | `--exclude <pattern>` | Exclude files from capture |
 | `--env-file <path>` | Include specific env file |
 | `--json` | Output in JSON format |
+
+### Where Artifacts Are Saved
+
+- **Default:** Current working directory (`process.cwd()`)
+- **With `-o`:** Specified directory (created if needed)
+- **With `.bugproofrc`:** Respects `outputDir` config field
+- **Default name:** `bug_<timestamp>.bug` (e.g., `bug_1747382901234.bug`)
+- **Custom name:** `<name>.bug` (e.g., `auth-crash.bug`)
 
 ### What Gets Captured
 
@@ -86,6 +95,7 @@ bugproof doctor
 
 ```bash
 bugproof replay <file.bug>
+bugproof replay <file.bug> --source-dir .   # Use current dir's git repo
 ```
 
 ### Verdicts
@@ -96,12 +106,21 @@ bugproof replay <file.bug>
 | `PARTIAL` | Some aspects matched |
 | `NO_MATCH` | Failure did not reproduce |
 
+### Replay Isolation
+
+Replay always runs in an isolated temp directory. Files come from:
+1. **Git worktree/clone** at the captured commit (if original path accessible)
+2. **Current directory's git repo** (fallback if original path gone)
+3. **Artifact's bundled `files/`** (final fallback)
+
+The current directory is **never read** for source files during replay.
+
 ### If NO_MATCH
 
 1. `bugproof inspect` — Check environment differences
 2. `bugproof diff` — Compare captures
 3. Check runtime versions and dependencies
-4. Verify working directory has correct files
+4. Use `--source-dir .` if original path is inaccessible
 
 ---
 
