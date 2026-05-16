@@ -12,7 +12,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { spawnSync } from 'child_process';
 import { isValidGitRef } from '../utils/security.js';
-import { mapToReplayEnvironment, normalizeArtifactPath } from '../utils/paths.js';
+import { normalizeArtifactPath } from '../utils/paths.js';
 
 export interface SandboxOptions {
   mode: 'current' | 'strict' | 'branch';
