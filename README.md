@@ -193,6 +193,89 @@ The MCP server communicates over **stdio** (JSON-RPC 2.0). It shells out to the 
 
 ---
 
+## AI Agent Skill
+
+BugProof ships a **distributable AI Agent Skill** that teaches AI coding agents (Claude Code, Cursor, OpenCode, OpenClaw, Gemini CLI, GitHub Copilot, and others) how to use BugProof effectively. The skill follows the open [Agent Skills](https://agentskills.io) standard — build once, use across any compatible agent.
+
+### What the Skill Does
+
+When loaded, the skill gives AI agents complete knowledge of:
+- All 14 BugProof commands with flags and examples
+- Capture, replay, diff, and inspection workflows
+- Cross-platform replay patterns
+- MCP server configuration
+- Best practices for naming, security, and artifact management
+- 8 real-world examples (Node.js, Python, Go, Java, CI/CD, cross-platform, flaky tests)
+
+### How AI Agents Use It
+
+Agents auto-load the skill when users mention:
+- "capture this bug"
+- "replay the bug"
+- "reproduce this failure"
+- "share this bug"
+- ".bug file"
+- "works on my machine"
+- "executable bug"
+
+Or invoke directly: `/bugproof`
+
+### Install the Skill
+
+#### Option 1: Clone This Repository
+
+```bash
+# Clone the BugProof repository
+git clone https://github.com/sidinsearch/BugProof.git
+
+# Copy the skill to your agent's skills directory
+# Claude Code:
+cp -r BugProof/skills/bugproof ~/.claude/skills/
+
+# OpenCode:
+cp -r BugProof/skills/bugproof ~/.config/opencode/skills/
+
+# OpenClaw:
+cp -r BugProof/skills/bugproof ~/.agents/skills/
+
+# Cursor:
+cp -r BugProof/skills/bugproof ~/.cursor/skills/
+```
+
+#### Option 2: Download the Skill Directly
+
+```bash
+# Download just the skill
+curl -L https://github.com/sidinsearch/BugProof/archive/refs/heads/main.tar.gz | tar xz
+cp -r BugProof-main/skills/bugproof ~/.claude/skills/
+```
+
+### Skill Structure
+
+```
+skills/bugproof/
+├── SKILL.md                    # Main instructions (required)
+├── reference/
+│   └── commands.md             # Full command reference
+└── examples/
+    └── usage-examples.md       # Real-world usage examples
+```
+
+### Supported AI Agents
+
+| Agent | Skill Directory |
+|-------|----------------|
+| Claude Code | `~/.claude/skills/bugproof/` |
+| OpenCode | `~/.config/opencode/skills/bugproof/` |
+| OpenClaw | `~/.agents/skills/bugproof/` |
+| Cursor | `~/.cursor/skills/bugproof/` |
+| Gemini CLI | `~/.gemini/skills/bugproof/` |
+| GitHub Copilot | `.github/skills/bugproof/` |
+
+The skill follows the open [Agent Skills specification](https://agentskills.io) — any agent that supports the standard can use it.
+
+---
+
 ## 60-Second Quick Start
 
 ```bash
