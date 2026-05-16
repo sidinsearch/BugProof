@@ -3,7 +3,7 @@
   "name": "io.github.sidinsearch/bugproof",
   "title": "BugProof",
   "description": "Capture, replay, and debug failures with portable executable bug artifacts",
-  "version": "1.1.24",
+  "version": "1.1.25",
   "websiteUrl": "https://github.com/sidinsearch/BugProof",
   "repository": {
     "url": "https://github.com/sidinsearch/BugProof",
@@ -45,7 +45,7 @@
     {
       "registryType": "npm",
       "identifier": "bugproof",
-      "version": "1.1.24",
+      "version": "1.1.25",
       "transport": {
         "type": "stdio"
       }
