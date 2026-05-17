@@ -2,7 +2,7 @@
  * BugProof Terminal UI — Production-grade CLI output.
  *
  * Features:
- * - ASCII art logo for --help and first-run experience
+ * - Terminal image logo (iTerm2/Sixel/Kitty/Unicode fallback)
  * - Terminal-width-aware section dividers
  * - Semantic color hierarchy (brand cyan, success green, warning yellow, error red)
  * - Branded spinner with elapsed time display
@@ -12,6 +12,9 @@
  * - Status rows for doctor/health output
  * - NO_COLOR / isTTY aware
  */
+
+import * as path from 'path';
+import * as fs from 'fs';
 
 const isColorSupported = process.stdout.isTTY && !process.env['NO_COLOR'];
 const isTTY = process.stdout.isTTY;
@@ -62,11 +65,61 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-/** Professional text logo — works in all terminals, no ASCII art blocks */
-export const ASCII_LOGO = 'BugProof';
+/** ASCII art logo fallback for terminals that don't support images */
+export const ASCII_LOGO = `
+  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588\u2588 
+  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588    \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588   
+  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588 
+`.trim();
 
 /** Compact logo for banners */
-export const COMPACT_LOGO = `${c.cyan(c.bold('BugProof'))}`;
+export const COMPACT_LOGO = `${c.cyan(c.bold('\uD83E\uDEB2  BugProof'))}`;
+
+/** Resolve the icon path from the package assets directory */
+function getIconPath(): string {
+  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+  // dist/utils/ -> dist/ -> root/
+  const rootDir = path.resolve(scriptDir, '..', '..');
+  return path.join(rootDir, 'assets', 'icon-512x512.png');
+}
+
+/** Render the BugProof logo image in the terminal with fallback */
+let _logoRendered = false;
+let _logoRenderPromise: Promise<void> | null = null;
+
+export async function renderLogo(): Promise<void> {
+  if (_logoRendered || _logoRenderPromise) {
+    await _logoRenderPromise;
+    return;
+  }
+
+  _logoRenderPromise = (async () => {
+    try {
+      const iconPath = getIconPath();
+      if (!fs.existsSync(iconPath)) {
+        // Fallback: print ASCII logo
+        console.log(c.cyan(ASCII_LOGO));
+        _logoRendered = true;
+        return;
+      }
+
+      // Try terminal-image for proper image rendering
+      const { default: terminalImage } = await import('terminal-image');
+      const rendered = await terminalImage.file(iconPath, {
+        width: 32,
+        preserveAspectRatio: true,
+      });
+      console.log(rendered);
+      _logoRendered = true;
+    } catch {
+      // Fallback to ASCII art on any failure
+      console.log(c.cyan(ASCII_LOGO));
+      _logoRendered = true;
+    }
+  })();
+
+  await _logoRenderPromise;
+}
 
 function getTerminalWidth(): number {
   if (isTTY && process.stdout.columns) return process.stdout.columns;
@@ -77,20 +130,19 @@ function line(len: number): string {
   return c.dim(icons.divider.repeat(Math.max(0, len)));
 }
 
-/** Clean banner with brand logo and subtitle */
+/** Animated banner with compact logo */
 export function banner(text: string): void {
   const width = getTerminalWidth();
-  const dividerLen = Math.min(width - 4, 80);
   console.log();
-  console.log(`${c.cyan(c.bold('  BugProof'))}${c.dim('  ' + text)}`);
-  console.log(c.dim('  ' + icons.divider.repeat(dividerLen)));
+  console.log(COMPACT_LOGO + c.dim('  ' + text));
+  console.log(line(width - 2));
 }
 
-/** Help banner — clean, professional, no ASCII art */
+/** Help banner with ASCII art (sync, for --help) */
 export function helpBanner(): void {
   console.log();
-  console.log(c.cyan(c.bold('  BugProof')));
-  console.log(c.dim('  Executable bugs, not bug reports.'));
+  console.log(c.cyan(ASCII_LOGO));
+  console.log(c.dim('  ') + c.bold('Executable bugs, not bug reports.'));
   console.log();
 }
 

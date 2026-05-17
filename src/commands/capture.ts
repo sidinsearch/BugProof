@@ -8,7 +8,7 @@ import { getGitContext } from '../utils/git.js';
 import { getBugProofVersion } from '../utils/version.js';
 import { formatCaptureJson } from '../utils/json-output.js';
 import { RunConfig } from '../types/artifact.js';
-import { banner, section, warn, error, info, kvIcon, c, icons, summaryBox } from '../utils/ui.js';
+import { banner, section, warn, error, info, kvIcon, c, icons, summaryBox, renderLogo } from '../utils/ui.js';
 import { detectMissingDependencies } from '../utils/dependencies.js';
 import {
   loadKeyPair,
@@ -63,7 +63,10 @@ export const captureCommand = new Command('capture')
       ? path.resolve(options.output)
       : path.resolve(config.outputDir);
 
-    if (!jsonMode) banner('BugProof Capture');
+    if (!jsonMode) {
+      await renderLogo();
+      banner(`${icons.bug} BugProof Capture`);
+    }
 
     // 1. Detect secrets
     const secrets = options.skipSecrets

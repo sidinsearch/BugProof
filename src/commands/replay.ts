@@ -5,7 +5,7 @@ import * as path from 'path';
 import { extractZip } from '../utils/archive.js';
 import { replayArtifact } from '../replay/engine.js';
 import { generateVerdict } from '../replay/verdict.js';
-import { banner, section, success, warn, error, info, kvLine, c, icons, Spinner, summaryBox } from '../utils/ui.js';
+import { banner, section, success, warn, error, info, kvLine, c, icons, Spinner, summaryBox, renderLogo } from '../utils/ui.js';
 import { generateHints } from '../replay/hints.js';
 import { selfHealReplay } from '../replay/self-heal.js';
 import { captureEnvSnapshot, compareEnvSnapshots, EnvSnapshot } from '../capture/env-snapshot.js';
@@ -53,7 +53,10 @@ export const replayCommand = new Command('replay')
       process.exit(1);
     }
 
-    if (!jsonMode) banner('BugProof Replay');
+    if (!jsonMode) {
+      await renderLogo();
+      banner(`${icons.arrow} BugProof Replay`);
+    }
 
     const stat = fs.statSync(artifact);
     let targetPath = artifact;
