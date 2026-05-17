@@ -2,7 +2,6 @@
  * BugProof Terminal UI — Production-grade CLI output.
  *
  * Features:
- * - Dynamic ASCII art logo via figlet (multiple fonts)
  * - Terminal image logo (iTerm2/Sixel/Kitty/Unicode fallback)
  * - Terminal-width-aware section dividers
  * - Semantic color hierarchy (brand cyan, success green, warning yellow, error red)
@@ -16,7 +15,6 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import figlet from 'figlet';
 
 const isColorSupported = process.stdout.isTTY && !process.env['NO_COLOR'];
 const isTTY = process.stdout.isTTY;
@@ -67,21 +65,8 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-/** Default figlet font for ASCII art */
-const FIGLET_FONT = 'ANSI Shadow';
-
-/** Generate ASCII art via figlet with fallback */
-export function generateAsciiArt(text: string = 'BugProof'): string {
-  try {
-    return figlet.textSync(text, { font: FIGLET_FONT });
-  } catch {
-    // Ultimate fallback — simple text
-    return text;
-  }
-}
-
-/** ASCII_LOGO is now dynamically generated */
-export const ASCII_LOGO = generateAsciiArt();
+/** Simple styled logo text */
+export const ASCII_LOGO = c.cyan(c.bold('BugProof'));
 
 /** Compact logo for banners */
 export const COMPACT_LOGO = `${c.cyan(c.bold('\uD83E\uDEB2  BugProof'))}`;
@@ -96,7 +81,7 @@ function getIconPath(size: 'small' | 'large' = 'large'): string {
   return path.join(rootDir, 'assets', filename);
 }
 
-/** Render the BugProof logo image in the terminal with figlet ASCII fallback */
+/** Render the BugProof logo image in the terminal with text fallback */
 let _logoRendered = false;
 let _logoRenderPromise: Promise<void> | null = null;
 
@@ -110,7 +95,7 @@ export async function renderLogo(): Promise<void> {
     try {
       const iconPath = getIconPath('large');
       if (!fs.existsSync(iconPath)) {
-        console.log(c.cyan(generateAsciiArt()));
+        console.log(ASCII_LOGO);
         _logoRendered = true;
         return;
       }
@@ -125,8 +110,7 @@ export async function renderLogo(): Promise<void> {
       console.log(rendered);
       _logoRendered = true;
     } catch {
-      // Fallback to figlet ASCII art
-      console.log(c.cyan(generateAsciiArt()));
+      console.log(ASCII_LOGO);
       _logoRendered = true;
     }
   })();
@@ -151,10 +135,10 @@ export function banner(text: string): void {
   console.log(line(width - 2));
 }
 
-/** Help banner with ASCII art (sync, for --help) */
+/** Help banner with styled logo (sync, for --help) */
 export function helpBanner(): void {
   console.log();
-  console.log(c.cyan(ASCII_LOGO));
+  console.log(ASCII_LOGO);
   console.log(c.dim('  ') + c.bold('Executable bugs, not bug reports.'));
   console.log();
 }
