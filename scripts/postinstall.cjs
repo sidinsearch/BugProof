@@ -218,10 +218,13 @@ function registerMacAssociation() {
 
 function main() {
   try {
-    // Show welcome banner
+    // Welcome banner
     console.log();
     console.log('\x1b[36m\x1b[1m  BugProof\x1b[22m\x1b[39m');
     console.log('\x1b[2m  Executable bugs, not bug reports.\x1b[22m');
+    console.log();
+    console.log('\x1b[2m  Capture failing commands as portable .bug artifacts.\x1b[22m');
+    console.log('\x1b[2m  Replay them anywhere to reproduce the exact failure.\x1b[22m');
     console.log();
 
     log('Starting install checks...');
@@ -238,11 +241,17 @@ function main() {
     registerLinuxAssociation();
     registerMacAssociation();
 
+    // Quick start guide
     console.log();
-    console.log('\x1b[2m  Quick start:\x1b[22m');
-    console.log('    \x1b[36mbugproof capture\x1b[39m \x1b[2m-- node -e "throw new Error(\'demo\')"\x1b[22m');
-    console.log('    \x1b[36mbugproof replay\x1b[39m  \x1b[2m<artifact>.bug\x1b[22m');
-    console.log('    \x1b[36mbugproof --help\x1b[39m  \x1b[2mfor all commands\x1b[22m');
+    console.log('\x1b[1m  Quick Start\x1b[22m');
+    console.log();
+    console.log('  \x1b[36m1. Capture\x1b[39m     \x1b[2mbugproof capture -- node -e "throw new Error(\'demo\')"\x1b[22m');
+    console.log('  \x1b[36m2. Replay\x1b[39m      \x1b[2mbugproof replay <artifact>.bug\x1b[22m');
+    console.log('  \x1b[36m3. Inspect\x1b[39m     \x1b[2mbugproof inspect <artifact>.bug\x1b[22m');
+    console.log('  \x1b[36m4. Diff\x1b[39m        \x1b[2mbugproof diff <a>.bug <b>.bug\x1b[22m');
+    console.log('  \x1b[36m5. Share\x1b[39m       \x1b[2mbugproof share <artifact>.bug\x1b[22m');
+    console.log();
+    console.log('\x1b[2m  Full docs: https://github.com/sidinsearch/BugProof\x1b[22m');
     console.log();
     log('Install checks complete.');
   } catch (err) {

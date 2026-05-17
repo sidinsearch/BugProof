@@ -62,8 +62,8 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-/** Professional text logo for banners */
-export const ASCII_LOGO = `BugProof`;
+/** Professional text logo — works in all terminals, no ASCII art blocks */
+export const ASCII_LOGO = 'BugProof';
 
 /** Compact logo for banners */
 export const COMPACT_LOGO = `${c.cyan(c.bold('BugProof'))}`;
@@ -77,19 +77,20 @@ function line(len: number): string {
   return c.dim(icons.divider.repeat(Math.max(0, len)));
 }
 
-/** Animated banner with compact logo — no ASCII art, clean professional look */
+/** Clean banner with brand logo and subtitle */
 export function banner(text: string): void {
   const width = getTerminalWidth();
+  const dividerLen = Math.min(width - 4, 80);
   console.log();
   console.log(`${c.cyan(c.bold('  BugProof'))}${c.dim('  ' + text)}`);
-  console.log(c.dim('  ' + icons.divider.repeat(Math.min(width - 4, 80))));
+  console.log(c.dim('  ' + icons.divider.repeat(dividerLen)));
 }
 
-/** Help banner — clean, no ASCII art */
+/** Help banner — clean, professional, no ASCII art */
 export function helpBanner(): void {
   console.log();
   console.log(c.cyan(c.bold('  BugProof')));
-  console.log(c.dim('  ') + c.bold('Executable bugs, not bug reports.'));
+  console.log(c.dim('  Executable bugs, not bug reports.'));
   console.log();
 }
 
