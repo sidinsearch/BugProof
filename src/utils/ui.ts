@@ -65,21 +65,19 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-const BRAND = 'BugProof';
 const TAGLINE = 'Executable bugs, not bug reports.';
-const BRAND_WIDTH = BRAND.length;
+const VERSION = typeof process !== 'undefined' && process.env?.['npm_package_version'] ? ` v${process.env['npm_package_version']}` : '';
 
-/** Branded logo banner with box-drawn border */
+/** Branded logo — prominent text with visual hierarchy */
 export const ASCII_LOGO = [
   '',
-  c.cyan(c.bold('  \u250C' + '\u2500'.repeat(BRAND_WIDTH + 6) + '\u2510')),
-  c.cyan(c.bold('  \u2502')) + '   ' + c.bold(c.cyan(BRAND)) + '   ' + c.cyan(c.bold('\u2502')),
-  c.cyan(c.bold('  \u2514' + '\u2500'.repeat(BRAND_WIDTH + 6) + '\u2518')),
+  c.bold(c.cyan('  BugProof')) + c.dim(VERSION),
+  c.dim('  ' + TAGLINE),
   '',
 ].join('\n');
 
-/** Compact logo for banners */
-export const COMPACT_LOGO = `${c.cyan(c.bold('\uD83E\uDEB2  BugProof'))}`;
+/** Compact logo for inline banners */
+export const COMPACT_LOGO = c.bold(c.cyan('\uD83E\uDEB2 BugProof'));
 
 /** Resolve the icon path from the package assets directory */
 function getIconPath(size: 'small' | 'large' = 'large'): string {
@@ -137,18 +135,20 @@ function line(len: number): string {
   return c.dim(icons.divider.repeat(Math.max(0, len)));
 }
 
-/** Animated banner with compact logo */
+/** Animated banner with compact logo and subtle separator */
 export function banner(text: string): void {
   const width = getTerminalWidth();
   console.log();
-  console.log(COMPACT_LOGO + c.dim('  ' + text));
-  console.log(line(width - 2));
+  console.log('  ' + COMPACT_LOGO + c.dim('  ' + text));
+  console.log(c.dim('  ' + '\u2500'.repeat(Math.min(width - 4, 60))));
 }
 
-/** Help banner with branded logo (sync, for --help) */
+/** Help banner — clean branded header for --help */
 export function helpBanner(): void {
+  const width = getTerminalWidth();
+  console.log();
   console.log(ASCII_LOGO);
-  console.log(c.dim('  ' + TAGLINE));
+  console.log(c.dim('  ' + '\u2500'.repeat(Math.min(width - 4, 60))));
   console.log();
 }
 
@@ -158,7 +158,7 @@ export function section(title: string): void {
   const titleLen = title.length + 3;
   const lineLen = Math.max(10, width - titleLen - 2);
   console.log();
-  console.log(c.bold('  ' + icons.box + ' ' + title) + ' ' + line(lineLen));
+  console.log(c.bold(c.cyan('  ' + icons.box + ' ' + title)) + ' ' + line(lineLen));
 }
 
 /** Compact section for nested output (reserved for future use) */
@@ -168,7 +168,7 @@ function _subSection(title: string): void {
 }
 
 export function success(msg: string): void {
-  console.log('  ' + c.green(icons.check) + '  ' + c.green(msg));
+  console.log('  ' + c.green(icons.check) + '  ' + msg);
 }
 
 export function warn(msg: string): void {
@@ -176,11 +176,11 @@ export function warn(msg: string): void {
 }
 
 export function error(msg: string): void {
-  console.log('  ' + c.red(icons.cross) + '  ' + c.red(msg));
+  console.log('  ' + c.red(icons.cross) + '  ' + c.bold(c.red(msg)));
 }
 
 export function info(msg: string): void {
-  console.log('  ' + c.cyan(icons.arrow) + '  ' + msg);
+  console.log('  ' + c.cyan(icons.arrow) + '  ' + c.dim(msg));
 }
 
 export function kvLine(key: string, value: string, keyWidth = 18): void {
