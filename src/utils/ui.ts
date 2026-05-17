@@ -4,7 +4,7 @@
  * Features:
  * - Terminal image logo (iTerm2/Sixel/Kitty/Unicode fallback)
  * - Terminal-width-aware section dividers
- * - Semantic color hierarchy (brand cyan, success green, warning yellow, error red)
+ * - Semantic color hierarchy (brand amber, success green, warning yellow, error red)
  * - Branded spinner with elapsed time display
  * - Progress bar for long-running operations
  * - Table renderer for structured output
@@ -24,59 +24,86 @@ function wrap(code: number, resetCode: number, text: string): string {
   return `\x1b[${code}m${text}\x1b[${resetCode}m`;
 }
 
+/** Wrap text with truecolor (24-bit) foreground */
+function rgb(r: number, g: number, b: number, text: string): string {
+  if (!isColorSupported) return text;
+  return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`;
+}
+
+/** Wrap text with truecolor (24-bit) background */
+function bgRgb(r: number, g: number, b: number, text: string): string {
+  if (!isColorSupported) return text;
+  return `\x1b[48;2;${r};${g};${b}m${text}\x1b[49m`;
+}
+
+/** Brand color: #FFAA33 — used for accent, logo, section headers */
+const BRAND_R = 255, BRAND_G = 170, BRAND_B = 51;
+
+/** Brand-colored text */
+function brand(text: string): string {
+  return rgb(BRAND_R, BRAND_G, BRAND_B, text);
+}
+
+/** Brand background */
+function bgBrand(text: string): string {
+  return bgRgb(BRAND_R, BRAND_G, BRAND_B, text);
+}
+
 export const c = {
-  bold:     (t: string) => wrap(1, 22, t),
-  dim:      (t: string) => wrap(2, 22, t),
-  italic:   (t: string) => wrap(3, 23, t),
-  underline:(t: string) => wrap(4, 24, t),
-  red:      (t: string) => wrap(31, 39, t),
-  green:    (t: string) => wrap(32, 39, t),
-  yellow:   (t: string) => wrap(33, 39, t),
-  blue:     (t: string) => wrap(34, 39, t),
-  magenta:  (t: string) => wrap(35, 39, t),
-  cyan:     (t: string) => wrap(36, 39, t),
-  white:    (t: string) => wrap(37, 39, t),
-  black:    (t: string) => wrap(30, 39, t),
-  gray:     (t: string) => wrap(90, 39, t),
-  bgCyan:   (t: string) => wrap(46, 49, t),
-  bgRed:    (t: string) => wrap(41, 49, t),
-  bgGreen:  (t: string) => wrap(42, 49, t),
+  bold:      (t: string) => wrap(1, 22, t),
+  dim:       (t: string) => wrap(2, 22, t),
+  italic:    (t: string) => wrap(3, 23, t),
+  underline: (t: string) => wrap(4, 24, t),
+  red:       (t: string) => wrap(31, 39, t),
+  green:     (t: string) => wrap(32, 39, t),
+  yellow:    (t: string) => wrap(33, 39, t),
+  blue:      (t: string) => wrap(34, 39, t),
+  magenta:   (t: string) => wrap(35, 39, t),
+  cyan:      (t: string) => wrap(36, 39, t),
+  white:     (t: string) => wrap(37, 39, t),
+  black:     (t: string) => wrap(30, 39, t),
+  gray:      (t: string) => wrap(90, 39, t),
+  bgCyan:    (t: string) => wrap(46, 49, t),
+  bgRed:     (t: string) => wrap(41, 49, t),
+  bgGreen:   (t: string) => wrap(42, 49, t),
+  brand,     // #FFAA33 foreground
+  bgBrand,   // #FFAA33 background
 };
 
 export const icons = {
-  check:    isColorSupported ? '\u2714' : '+',
-  cross:    isColorSupported ? '\u2718' : 'x',
-  warning:  isColorSupported ? '\u26A0' : '!',
-  arrow:    isColorSupported ? '\u279C' : '>',
-  bug:      isColorSupported ? '\uD83E\uDEB2' : '*',
-  box:      isColorSupported ? '\u25A0' : '#',
-  dot:      isColorSupported ? '\u2022' : '-',
-  divider:  isColorSupported ? '\u2501' : '-',
-  corner:   isColorSupported ? '\u251C' : '+',
-  cornerEnd:isColorSupported ? '\u2514' : '+',
-  line:     isColorSupported ? '\u2502' : '|',
-  shield:   isColorSupported ? '\uD83D\uDEE1' : '[S]',
-  key:      isColorSupported ? '\uD83D\uDD11' : '[K]',
-  replay:   isColorSupported ? '\uD83D\uDD04' : '[R]',
-  share:    isColorSupported ? '\uD83D\uDCE4' : '[>]',
-  inspect:  isColorSupported ? '\uD83D\uDD0D' : '[?]',
-  diff:     isColorSupported ? '\u2260' : '!=',
-  clean:    isColorSupported ? '\uD83E\uDDF9' : '[C]',
-  doctor:   isColorSupported ? '\uD83E\uDE7A' : '[D]',
-  watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
+  check:     isColorSupported ? '\u2714' : '+',
+  cross:     isColorSupported ? '\u2718' : 'x',
+  warning:   isColorSupported ? '\u26A0' : '!',
+  arrow:     isColorSupported ? '\u279C' : '>',
+  bug:       isColorSupported ? '\uD83E\uDEB2' : '*',
+  box:       isColorSupported ? '\u25A0' : '#',
+  dot:       isColorSupported ? '\u2022' : '-',
+  divider:   isColorSupported ? '\u2501' : '-',
+  corner:    isColorSupported ? '\u251C' : '+',
+  cornerEnd: isColorSupported ? '\u2514' : '+',
+  line:      isColorSupported ? '\u2502' : '|',
+  shield:    isColorSupported ? '\uD83D\uDEE1' : '[S]',
+  key:       isColorSupported ? '\uD83D\uDD11' : '[K]',
+  replay:    isColorSupported ? '\uD83D\uDD04' : '[R]',
+  share:     isColorSupported ? '\uD83D\uDCE4' : '[>]',
+  inspect:   isColorSupported ? '\uD83D\uDD0D' : '[?]',
+  diff:      isColorSupported ? '\u2260' : '!=',
+  clean:     isColorSupported ? '\uD83E\uDDF9' : '[C]',
+  doctor:    isColorSupported ? '\uD83E\uDE7A' : '[D]',
+  watch:     isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
 const TAGLINE = 'Executable bugs, not bug reports.';
 
-/** Branded logo — clean, bold, prominent */
+/** Branded logo — amber badge with white text */
 export const ASCII_LOGO = [
   '',
-  c.bgCyan(c.bold(c.black(' BugProof '))) + c.dim('  ' + TAGLINE),
+  c.bgBrand(c.bold(c.white(' BugProof '))) + c.dim('  ' + TAGLINE),
   '',
 ].join('\n');
 
 /** Compact logo for inline banners */
-export const COMPACT_LOGO = c.bold(c.cyan('\uD83E\uDEB2 BugProof'));
+export const COMPACT_LOGO = c.bold(brand('\uD83E\uDEB2 BugProof'));
 
 /** Resolve the icon path from the package assets directory */
 function getIconPath(size: 'small' | 'large' = 'large'): string {
@@ -153,7 +180,7 @@ export function section(title: string): void {
   const titleLen = title.length + 3;
   const lineLen = Math.max(10, width - titleLen - 2);
   console.log();
-  console.log(c.bold(c.cyan('  ' + icons.box + ' ' + title)) + ' ' + line(lineLen));
+  console.log(c.bold(brand('  ' + icons.box + ' ' + title)) + ' ' + line(lineLen));
 }
 
 /** Compact section for nested output (reserved for future use) */
@@ -175,7 +202,7 @@ export function error(msg: string): void {
 }
 
 export function info(msg: string): void {
-  console.log('  ' + c.cyan(icons.arrow) + '  ' + c.dim(msg));
+  console.log('  ' + brand(icons.arrow) + '  ' + c.dim(msg));
 }
 
 export function kvLine(key: string, value: string, keyWidth = 18): void {
@@ -235,7 +262,7 @@ export class ProgressBar {
     const pct = Math.min(100, Math.round((current / this.total) * 100));
     const filled = Math.round((this.width * pct) / 100);
     const empty = this.width - filled;
-    const bar = c.cyan('\u2588'.repeat(filled)) + c.dim('\u2591'.repeat(empty));
+    const bar = brand('\u2588'.repeat(filled)) + c.dim('\u2591'.repeat(empty));
     const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
     const suffixStr = suffix ? ` ${c.dim(suffix)}` : '';
     process.stdout.write(`\r  ${this.label} ${bar} ${pct}% ${c.dim(`(${elapsed}s)`)}${suffixStr}`);
@@ -269,7 +296,7 @@ export class Spinner {
 
   start() {
     if (!isTTY) {
-      console.log(`  ${c.cyan(icons.arrow)}  ${this.message}...`);
+      console.log(`  ${brand(icons.arrow)}  ${this.message}...`);
       return;
     }
     process.stdout.write('\x1B[?25l');
@@ -278,7 +305,7 @@ export class Spinner {
 
   private render() {
     const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
-    process.stdout.write(`\r  ${c.cyan(this.frames[this.currentFrame])}  ${this.message}${c.dim(` (${elapsed}s)`)}`);
+    process.stdout.write(`\r  ${brand(this.frames[this.currentFrame])}  ${this.message}${c.dim(` (${elapsed}s)`)}`);
     this.currentFrame = (this.currentFrame + 1) % this.frames.length;
   }
 
@@ -301,7 +328,7 @@ export function table(headers: string[], rows: string[][], colWidths?: number[])
     Math.max(h.length, ...rows.map(r => (r[i] || '').length))
   );
 
-  const headerLine = headers.map((h, i) => c.bold(c.cyan(h.padEnd(widths[i])))).join('  ');
+  const headerLine = headers.map((h, i) => c.bold(brand(h.padEnd(widths[i])))).join('  ');
   console.log('  ' + headerLine);
   console.log('  ' + c.dim(widths.map(w => icons.divider.repeat(w)).join('  ')));
 
@@ -325,9 +352,9 @@ export function summaryBox(title: string, items: { label: string; value: string;
   console.log();
   const boxInnerWidth = labelPad + Math.min(maxValWidth, 60);
 
-  console.log(c.cyan(c.bold('  \u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510')));
-  console.log(c.cyan(c.bold('  \u2502')) + c.cyan(c.bold(' ' + title + ' '.repeat(boxInnerWidth - title.length - 1))) + c.cyan(c.bold('\u2502')));
-  console.log(c.cyan(c.bold('  \u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524')));
+console.log(brand(c.bold('  \u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510')));
+console.log(brand(c.bold('  \u2502')) + brand(c.bold(' ' + title + ' '.repeat(boxInnerWidth - title.length - 1))) + brand(c.bold('\u2502')));
+console.log(brand(c.bold('  \u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524')));
   for (const item of items) {
     const label = item.highlight ? c.bold(item.label) : c.dim(item.label);
     const paddedLabel = label + ' '.repeat(Math.max(0, maxLabel - stripAnsi(item.label).length + 2));
@@ -340,14 +367,14 @@ export function summaryBox(title: string, items: { label: string; value: string;
     }
 
     const lineContent = ` ${paddedLabel}${displayValue}`;
-    console.log(c.cyan(c.bold('  \u2502')) + lineContent + ' '.repeat(Math.max(0, boxInnerWidth - stripAnsi(lineContent).length)) + c.cyan(c.bold('\u2502')));
-  }
-  console.log(c.cyan(c.bold('  \u2514' + '\u2501'.repeat(boxInnerWidth) + '\u2518')));
+console.log(brand(c.bold('  \u2502')) + lineContent + ' '.repeat(Math.max(0, boxInnerWidth - stripAnsi(lineContent).length)) + brand(c.bold('\u2502')));
+}
+console.log(brand(c.bold('  \u2514' + '\u2501'.repeat(boxInnerWidth) + '\u2518')));
   console.log();
 }
 
 /** Strip ANSI escape codes from a string for length calculation */
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
-  return str.replace(/\u001b\[[0-9;]*m/g, '');
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
 }

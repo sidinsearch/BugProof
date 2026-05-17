@@ -218,18 +218,16 @@ function registerMacAssociation() {
 
 function main() {
   try {
-    // Branded welcome banner
+    // Branded welcome banner — #FFAA33 brand color
     const R = '\x1b[0m';
     const B = '\x1b[1m';
     const D = '\x1b[2m';
-    const C = '\x1b[36m';
-    const G = '\x1b[32m';
-    const W = '\x1b[33m';
-    const BG_C = '\x1b[46m';
-    const BLK = '\x1b[30m';
+    const W = '\x1b[37m';     // white fg
+    const BRAND = '\x1b[38;2;255;170;51m';  // #FFAA33 fg
+    const BG_BRAND = '\x1b[48;2;255;170;51m'; // #FFAA33 bg
 
     console.log();
-    console.log(`  ${BG_C}${BLK}${B} BugProof ${R}  ${D}Executable bugs, not bug reports.${R}`);
+    console.log(`  ${BG_BRAND}${W}${B} BugProof ${R}  ${D}Executable bugs, not bug reports.${R}`);
     console.log();
 
     // Install checks
@@ -251,19 +249,19 @@ function main() {
     console.log();
     console.log(`  ${B}Quick Start${R}`);
     console.log();
-    console.log(`  ${C}${B}capture${R}  ${D}Capture a failing command${R}`);
+    console.log(`  ${BRAND}${B}capture${R}  ${D}Capture a failing command${R}`);
     console.log(`  ${D}           bugproof capture -- node -e "throw new Error('demo')"${R}`);
     console.log();
-    console.log(`  ${C}${B}replay${R}   ${D}Replay a captured bug${R}`);
+    console.log(`  ${BRAND}${B}replay${R}   ${D}Replay a captured bug${R}`);
     console.log(`  ${D}           bugproof replay bug-2024-01-15.bug${R}`);
     console.log();
-    console.log(`  ${C}${B}inspect${R}  ${D}Inspect artifact contents${R}`);
+    console.log(`  ${BRAND}${B}inspect${R}  ${D}Inspect artifact contents${R}`);
     console.log(`  ${D}           bugproof inspect bug-2024-01-15.bug${R}`);
     console.log();
-    console.log(`  ${C}${B}diff${R}     ${D}Compare two bug artifacts${R}`);
+    console.log(`  ${BRAND}${B}diff${R}     ${D}Compare two bug artifacts${R}`);
     console.log(`  ${D}           bugproof diff a.bug b.bug${R}`);
     console.log();
-    console.log(`  ${C}${B}share${R}    ${D}Share via GitHub Gist${R}`);
+    console.log(`  ${BRAND}${B}share${R}    ${D}Share via GitHub Gist${R}`);
     console.log(`  ${D}           bugproof share bug-2024-01-15.bug${R}`);
     console.log();
     console.log(`  ${D}${'─'.repeat(60)}${R}`);
