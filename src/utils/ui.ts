@@ -65,8 +65,18 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-/** Simple styled logo text */
-export const ASCII_LOGO = c.cyan(c.bold('BugProof'));
+const BRAND = 'BugProof';
+const TAGLINE = 'Executable bugs, not bug reports.';
+const BRAND_WIDTH = BRAND.length;
+
+/** Branded logo banner with box-drawn border */
+export const ASCII_LOGO = [
+  '',
+  c.cyan(c.bold('  \u250C' + '\u2500'.repeat(BRAND_WIDTH + 6) + '\u2510')),
+  c.cyan(c.bold('  \u2502')) + '   ' + c.bold(c.cyan(BRAND)) + '   ' + c.cyan(c.bold('\u2502')),
+  c.cyan(c.bold('  \u2514' + '\u2500'.repeat(BRAND_WIDTH + 6) + '\u2518')),
+  '',
+].join('\n');
 
 /** Compact logo for banners */
 export const COMPACT_LOGO = `${c.cyan(c.bold('\uD83E\uDEB2  BugProof'))}`;
@@ -135,11 +145,10 @@ export function banner(text: string): void {
   console.log(line(width - 2));
 }
 
-/** Help banner with styled logo (sync, for --help) */
+/** Help banner with branded logo (sync, for --help) */
 export function helpBanner(): void {
-  console.log();
   console.log(ASCII_LOGO);
-  console.log(c.dim('  ') + c.bold('Executable bugs, not bug reports.'));
+  console.log(c.dim('  ' + TAGLINE));
   console.log();
 }
 
