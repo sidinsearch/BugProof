@@ -36,6 +36,7 @@ export const c = {
   magenta:  (t: string) => wrap(35, 39, t),
   cyan:     (t: string) => wrap(36, 39, t),
   white:    (t: string) => wrap(37, 39, t),
+  black:    (t: string) => wrap(30, 39, t),
   gray:     (t: string) => wrap(90, 39, t),
   bgCyan:   (t: string) => wrap(46, 49, t),
   bgRed:    (t: string) => wrap(41, 49, t),
@@ -66,13 +67,11 @@ export const icons = {
 };
 
 const TAGLINE = 'Executable bugs, not bug reports.';
-const VERSION = typeof process !== 'undefined' && process.env?.['npm_package_version'] ? ` v${process.env['npm_package_version']}` : '';
 
-/** Branded logo — prominent text with visual hierarchy */
+/** Branded logo — clean, bold, prominent */
 export const ASCII_LOGO = [
   '',
-  c.bold(c.cyan('  BugProof')) + c.dim(VERSION),
-  c.dim('  ' + TAGLINE),
+  c.bgCyan(c.bold(c.black(' BugProof '))) + c.dim('  ' + TAGLINE),
   '',
 ].join('\n');
 
@@ -145,11 +144,7 @@ export function banner(text: string): void {
 
 /** Help banner — clean branded header for --help */
 export function helpBanner(): void {
-  const width = getTerminalWidth();
-  console.log();
   console.log(ASCII_LOGO);
-  console.log(c.dim('  ' + '\u2500'.repeat(Math.min(width - 4, 60))));
-  console.log();
 }
 
 /** Terminal-width-aware section header */

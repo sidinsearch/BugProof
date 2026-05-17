@@ -218,16 +218,22 @@ function registerMacAssociation() {
 
 function main() {
   try {
-    // Welcome banner
+    // Branded welcome banner
+    const R = '\x1b[0m';
+    const B = '\x1b[1m';
+    const D = '\x1b[2m';
+    const C = '\x1b[36m';
+    const G = '\x1b[32m';
+    const W = '\x1b[33m';
+    const BG_C = '\x1b[46m';
+    const BLK = '\x1b[30m';
+
     console.log();
-    console.log('\x1b[36m\x1b[1m  BugProof\x1b[22m\x1b[39m');
-    console.log('\x1b[2m  Executable bugs, not bug reports.\x1b[22m');
-    console.log();
-    console.log('\x1b[2m  Capture failing commands as portable .bug artifacts.\x1b[22m');
-    console.log('\x1b[2m  Replay them anywhere to reproduce the exact failure.\x1b[22m');
+    console.log(`  ${BG_C}${BLK}${B} BugProof ${R}  ${D}Executable bugs, not bug reports.${R}`);
     console.log();
 
-    log('Starting install checks...');
+    // Install checks
+    log('Running install checks...');
     checkNodeVersion();
     checkGit();
     checkOptionalTooling();
@@ -243,17 +249,28 @@ function main() {
 
     // Quick start guide
     console.log();
-    console.log('\x1b[1m  Quick Start\x1b[22m');
+    console.log(`  ${B}Quick Start${R}`);
     console.log();
-    console.log('  \x1b[36m1. Capture\x1b[39m     \x1b[2mbugproof capture -- node -e "throw new Error(\'demo\')"\x1b[22m');
-    console.log('  \x1b[36m2. Replay\x1b[39m      \x1b[2mbugproof replay <artifact>.bug\x1b[22m');
-    console.log('  \x1b[36m3. Inspect\x1b[39m     \x1b[2mbugproof inspect <artifact>.bug\x1b[22m');
-    console.log('  \x1b[36m4. Diff\x1b[39m        \x1b[2mbugproof diff <a>.bug <b>.bug\x1b[22m');
-    console.log('  \x1b[36m5. Share\x1b[39m       \x1b[2mbugproof share <artifact>.bug\x1b[22m');
+    console.log(`  ${C}${B}capture${R}  ${D}Capture a failing command${R}`);
+    console.log(`  ${D}           bugproof capture -- node -e "throw new Error('demo')"${R}`);
     console.log();
-    console.log('\x1b[2m  Full docs: https://github.com/sidinsearch/BugProof\x1b[22m');
+    console.log(`  ${C}${B}replay${R}   ${D}Replay a captured bug${R}`);
+    console.log(`  ${D}           bugproof replay bug-2024-01-15.bug${R}`);
     console.log();
-    log('Install checks complete.');
+    console.log(`  ${C}${B}inspect${R}  ${D}Inspect artifact contents${R}`);
+    console.log(`  ${D}           bugproof inspect bug-2024-01-15.bug${R}`);
+    console.log();
+    console.log(`  ${C}${B}diff${R}     ${D}Compare two bug artifacts${R}`);
+    console.log(`  ${D}           bugproof diff a.bug b.bug${R}`);
+    console.log();
+    console.log(`  ${C}${B}share${R}    ${D}Share via GitHub Gist${R}`);
+    console.log(`  ${D}           bugproof share bug-2024-01-15.bug${R}`);
+    console.log();
+    console.log(`  ${D}${'─'.repeat(60)}${R}`);
+    console.log(`  ${D}Docs: https://github.com/sidinsearch/BugProof${R}`);
+    console.log();
+
+    log('Install complete.');
   } catch (err) {
     log(`WARNING: postinstall completed with non-fatal error: ${err instanceof Error ? err.message : String(err)}`);
   }
