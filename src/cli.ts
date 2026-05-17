@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { captureCommand } from './commands/capture.js';
 import { replayCommand } from './commands/replay.js';
 import { inspectCommand } from './commands/inspect.js';
@@ -15,7 +17,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { keygenCommand } from './commands/keygen.js';
 import { verifyCommand } from './commands/verify.js';
 import { mcpCommand } from './commands/mcp.js';
-import { helpBanner, ASCII_LOGO, COMPACT_LOGO } from './utils/ui.js';
+import { helpBanner, ASCII_LOGO, COMPACT_LOGO, c } from './utils/ui.js';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
@@ -28,6 +30,42 @@ function enforceNodeVersion(): void {
 }
 
 enforceNodeVersion();
+
+/** Show a welcome message on first run (creates a marker file so it only shows once) */
+function showFirstRunWelcome(): void {
+  const markerPath = path.join(os.homedir(), '.bugproof-welcomed');
+  if (fs.existsSync(markerPath)) return;
+
+  console.log(ASCII_LOGO);
+  console.log(c.bold('  Quick Start'));
+  console.log();
+  console.log(`  ${c.brand(c.bold('capture'))}  Capture a failing command`);
+  console.log(c.dim('           bugproof capture -- node -e "throw new Error(\'demo\')"'));
+  console.log();
+  console.log(`  ${c.brand(c.bold('replay'))}   Replay a captured bug`);
+  console.log(c.dim('           bugproof replay bug-2024-01-15.bug'));
+  console.log();
+  console.log(`  ${c.brand(c.bold('inspect'))}  Inspect artifact contents`);
+  console.log(c.dim('           bugproof inspect bug-2024-01-15.bug'));
+  console.log();
+  console.log(`  ${c.brand(c.bold('diff'))}     Compare two bug artifacts`);
+  console.log(c.dim('           bugproof diff a.bug b.bug'));
+  console.log();
+  console.log(`  ${c.brand(c.bold('share'))}    Share via GitHub Gist`);
+  console.log(c.dim('           bugproof share bug-2024-01-15.bug'));
+  console.log();
+  console.log(c.dim('  ' + '─'.repeat(60)));
+  console.log(c.dim('  Docs: https://github.com/sidinsearch/BugProof'));
+  console.log(c.dim('  Run `bugproof --help` for all commands'));
+  console.log();
+
+  try { fs.writeFileSync(markerPath, VERSION); } catch { /* ignore */ }
+}
+
+// If called with no arguments, show welcome on first run then help
+if (process.argv.length <= 2) {
+  showFirstRunWelcome();
+}
 
 const program = new Command();
 

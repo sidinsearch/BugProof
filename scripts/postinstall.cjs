@@ -218,20 +218,7 @@ function registerMacAssociation() {
 
 function main() {
   try {
-    // Branded welcome banner — #FFAA33 brand color, dark text on bg
-    const R = '\x1b[0m';
-    const B = '\x1b[1m';
-    const D = '\x1b[2m';
-    const DARK = '\x1b[38;2;42;42;42m';         // dark grey on amber bg
-    const BRAND = '\x1b[38;2;255;170;51m';       // #FFAA33 fg
-    const BG_BRAND = '\x1b[48;2;255;170;51m';    // #FFAA33 bg
-
-    console.log();
-    console.log(`  ${BG_BRAND}${DARK}${B} BugProof ${R}  ${D}Executable bugs, not bug reports.${R}`);
-    console.log();
-
-    // Install checks
-    log('Running install checks...');
+    // System checks and file associations (silent — npm may suppress postinstall output)
     checkNodeVersion();
     checkGit();
     checkOptionalTooling();
@@ -245,30 +232,7 @@ function main() {
     registerLinuxAssociation();
     registerMacAssociation();
 
-    // Quick start guide
-    console.log();
-    console.log(`  ${B}Quick Start${R}`);
-    console.log();
-    console.log(`  ${BRAND}${B}capture${R}  ${D}Capture a failing command${R}`);
-    console.log(`  ${D}           bugproof capture -- node -e "throw new Error('demo')"${R}`);
-    console.log();
-    console.log(`  ${BRAND}${B}replay${R}   ${D}Replay a captured bug${R}`);
-    console.log(`  ${D}           bugproof replay bug-2024-01-15.bug${R}`);
-    console.log();
-    console.log(`  ${BRAND}${B}inspect${R}  ${D}Inspect artifact contents${R}`);
-    console.log(`  ${D}           bugproof inspect bug-2024-01-15.bug${R}`);
-    console.log();
-    console.log(`  ${BRAND}${B}diff${R}     ${D}Compare two bug artifacts${R}`);
-    console.log(`  ${D}           bugproof diff a.bug b.bug${R}`);
-    console.log();
-    console.log(`  ${BRAND}${B}share${R}    ${D}Share via GitHub Gist${R}`);
-    console.log(`  ${D}           bugproof share bug-2024-01-15.bug${R}`);
-    console.log();
-    console.log(`  ${D}${'─'.repeat(60)}${R}`);
-    console.log(`  ${D}Docs: https://github.com/sidinsearch/BugProof${R}`);
-    console.log();
-
-    log('Install complete.');
+    log('Install complete. Run `bugproof --help` to get started.');
   } catch (err) {
     log(`WARNING: postinstall completed with non-fatal error: ${err instanceof Error ? err.message : String(err)}`);
   }
