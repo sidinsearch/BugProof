@@ -65,7 +65,7 @@ export const captureCommand = new Command('capture')
 
     if (!jsonMode) {
       await renderLogo();
-      banner(`${icons.bug} BugProof Capture`);
+      banner('Capture');
     }
 
     // 1. Detect secrets

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { pullFromGist } from '../share/pull.js';
-import { banner, info, kvLine, c, icons, Spinner } from '../utils/ui.js';
+import { banner, info, kvLine, c, Spinner } from '../utils/ui.js';
 
 export const pullCommand = new Command('pull')
   .description('Download a .bug artifact from a GitHub Gist')
@@ -10,7 +10,7 @@ export const pullCommand = new Command('pull')
   .action(async (gistInput: string, options) => {
     const jsonMode = options.json === true;
 
-    if (!jsonMode) banner(`${icons.arrow} BugProof Pull`);
+    if (!jsonMode) banner('Pull');
 
     let spinner: Spinner | undefined;
     if (!jsonMode) {

@@ -1,11 +1,11 @@
 import { Command } from 'commander';
 import { pruneTempDirectories } from '../utils/cleanup.js';
-import { banner, success, info, kvLine, icons } from '../utils/ui.js';
+import { banner, success, info, kvLine } from '../utils/ui.js';
 
 export const pruneCommand = new Command('prune')
   .description('Clean up temporary sandbox and artifact directories')
   .action(() => {
-    banner(`${icons.arrow} BugProof Prune`);
+    banner('Prune');
     info('Scanning temporary directories...');
     const result = pruneTempDirectories();
     if (result.prunedCount === 0) {

@@ -13,7 +13,7 @@ export const cleanCommand = new Command('clean')
     const searchDir = process.cwd();
     const maxDepth = options.all ? 10 : 1;
 
-    if (!jsonMode) banner(`${icons.arrow} BugProof Clean`);
+    if (!jsonMode) banner('Clean');
 
     const artifacts: string[] = [];
     let totalSize = 0;

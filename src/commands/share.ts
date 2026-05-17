@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import { shareToGist, sanitizeShareError } from '../share/gist.js';
-import { banner, info, kvLine, c, icons, Spinner, ProgressBar, exitWithError } from '../utils/ui.js';
+import { banner, info, kvLine, c, Spinner, ProgressBar, exitWithError } from '../utils/ui.js';
 
 export const shareCommand = new Command('share')
   .description('Share a .bug artifact via GitHub Gist')
@@ -19,7 +19,7 @@ export const shareCommand = new Command('share')
     let progress: ProgressBar | undefined;
     let progressInterval: ReturnType<typeof setInterval> | undefined;
     if (!jsonMode) {
-      banner(`${icons.arrow} BugProof Share`);
+      banner('Share');
       spinner = new Spinner('Uploading artifact to GitHub Gist');
       spinner.start();
       const sizeMB = fs.statSync(artifact).size / (1024 * 1024);

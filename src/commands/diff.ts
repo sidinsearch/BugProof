@@ -58,7 +58,7 @@ export const diffCommand = new Command('diff')
       return;
     }
 
-    banner('BugProof Diff');
+    banner('Diff');
 
     kvLine('Left', left.manifest.name);
     kvLine('Right', right.manifest.name);

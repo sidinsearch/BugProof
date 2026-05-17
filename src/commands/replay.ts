@@ -55,7 +55,7 @@ export const replayCommand = new Command('replay')
 
     if (!jsonMode) {
       await renderLogo();
-      banner(`${icons.arrow} BugProof Replay`);
+      banner('Replay');
     }
 
     const stat = fs.statSync(artifact);

@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { extractZip } from '../utils/archive.js';
-import { banner, success, error, info, warn, kvLine, c, icons } from '../utils/ui.js';
+import { banner, success, error, info, warn, kvLine, c } from '../utils/ui.js';
 import {
   secureJsonParse,
   validateArtifactManifest,
@@ -34,7 +34,7 @@ export const verifyCommand = new Command('verify')
       process.exit(1);
     }
 
-    if (!jsonMode) banner(`${icons.arrow} BugProof Verify`);
+    if (!jsonMode) banner('Verify');
 
     const stat = fs.statSync(artifact);
     let targetPath = artifact;

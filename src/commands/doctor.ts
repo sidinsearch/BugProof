@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as os from 'os';
 import { detectCapabilities } from '../sandbox/capabilities.js';
-import { banner, section, warn, kvLine, icons, statusRow } from '../utils/ui.js';
+import { banner, section, warn, kvLine, statusRow } from '../utils/ui.js';
 
 export const doctorCommand = new Command('doctor')
   .description('Verify host OS support for sandboxing and features')
@@ -23,7 +23,7 @@ export const doctorCommand = new Command('doctor')
       return;
     }
 
-    banner(`${icons.arrow} BugProof Doctor`);
+    banner('Doctor');
 
     section('Host Information');
     kvLine('OS', `${os.type()} ${os.release()}`);

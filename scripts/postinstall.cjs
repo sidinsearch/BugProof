@@ -218,16 +218,16 @@ function registerMacAssociation() {
 
 function main() {
   try {
-    // Branded welcome banner — #FFAA33 brand color
+    // Branded welcome banner — #FFAA33 brand color, dark text on bg
     const R = '\x1b[0m';
     const B = '\x1b[1m';
     const D = '\x1b[2m';
-    const W = '\x1b[37m';     // white fg
-    const BRAND = '\x1b[38;2;255;170;51m';  // #FFAA33 fg
-    const BG_BRAND = '\x1b[48;2;255;170;51m'; // #FFAA33 bg
+    const DARK = '\x1b[38;2;42;42;42m';         // dark grey on amber bg
+    const BRAND = '\x1b[38;2;255;170;51m';       // #FFAA33 fg
+    const BG_BRAND = '\x1b[48;2;255;170;51m';    // #FFAA33 bg
 
     console.log();
-    console.log(`  ${BG_BRAND}${W}${B} BugProof ${R}  ${D}Executable bugs, not bug reports.${R}`);
+    console.log(`  ${BG_BRAND}${DARK}${B} BugProof ${R}  ${D}Executable bugs, not bug reports.${R}`);
     console.log();
 
     // Install checks

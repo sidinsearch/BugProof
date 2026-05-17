@@ -53,7 +53,7 @@ export const inspectCommand = new Command('inspect')
         return;
       }
 
-      banner('BugProof Inspect');
+      banner('Inspect');
 
       section('Manifest');
       kvLine('Name', manifest.name);

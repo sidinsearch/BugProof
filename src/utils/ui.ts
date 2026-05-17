@@ -2,7 +2,6 @@
  * BugProof Terminal UI — Production-grade CLI output.
  *
  * Features:
- * - Terminal image logo (iTerm2/Sixel/Kitty/Unicode fallback)
  * - Terminal-width-aware section dividers
  * - Semantic color hierarchy (brand amber, success green, warning yellow, error red)
  * - Branded spinner with elapsed time display
@@ -12,9 +11,6 @@
  * - Status rows for doctor/health output
  * - NO_COLOR / isTTY aware
  */
-
-import * as path from 'path';
-import * as fs from 'fs';
 
 const isColorSupported = process.stdout.isTTY && !process.env['NO_COLOR'];
 const isTTY = process.stdout.isTTY;
@@ -36,8 +32,11 @@ function bgRgb(r: number, g: number, b: number, text: string): string {
   return `\x1b[48;2;${r};${g};${b}m${text}\x1b[49m`;
 }
 
-/** Brand color: #FFAA33 — used for accent, logo, section headers */
+/** Brand color: #FFAA33 */
 const BRAND_R = 255, BRAND_G = 170, BRAND_B = 51;
+
+/** Dark grey for text on brand background: #2A2A2A */
+const DARK_R = 42, DARK_G = 42, DARK_B = 42;
 
 /** Brand-colored text */
 function brand(text: string): string {
@@ -47,6 +46,11 @@ function brand(text: string): string {
 /** Brand background */
 function bgBrand(text: string): string {
   return bgRgb(BRAND_R, BRAND_G, BRAND_B, text);
+}
+
+/** Dark text (for on-brand-bg) */
+function dark(text: string): string {
+  return rgb(DARK_R, DARK_G, DARK_B, text);
 }
 
 export const c = {
@@ -66,8 +70,9 @@ export const c = {
   bgCyan:    (t: string) => wrap(46, 49, t),
   bgRed:     (t: string) => wrap(41, 49, t),
   bgGreen:   (t: string) => wrap(42, 49, t),
-  brand,     // #FFAA33 foreground
-  bgBrand,   // #FFAA33 background
+  brand,
+  bgBrand,
+  dark,
 };
 
 export const icons = {
@@ -95,61 +100,22 @@ export const icons = {
 
 const TAGLINE = 'Executable bugs, not bug reports.';
 
-/** Branded logo — amber badge with white text */
+/** Branded logo — amber badge with dark text */
 export const ASCII_LOGO = [
   '',
-  c.bgBrand(c.bold(c.white(' BugProof '))) + c.dim('  ' + TAGLINE),
+  c.bgBrand(c.bold(dark(' BugProof '))) + c.dim('  ' + TAGLINE),
   '',
 ].join('\n');
 
-/** Compact logo for inline banners */
-export const COMPACT_LOGO = c.bold(brand('\uD83E\uDEB2 BugProof'));
+/** Compact logo for inline banners — just the brand name, no icon */
+export const COMPACT_LOGO = c.bold(brand('BugProof'));
 
-/** Resolve the icon path from the package assets directory */
-function getIconPath(size: 'small' | 'large' = 'large'): string {
-  // __dirname works in both CommonJS (Jest) and ESM (via ts-jest transformation)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dir = typeof __dirname !== 'undefined' ? __dirname : (globalThis as any).__dirname || '.';
-  const rootDir = path.resolve(dir, '..', '..');
-  const filename = size === 'small' ? 'icon-32x32.png' : 'icon-512x512.png';
-  return path.join(rootDir, 'assets', filename);
-}
-
-/** Render the BugProof logo image in the terminal with text fallback */
+/** Print the branded logo (text-only, no image) */
 let _logoRendered = false;
-let _logoRenderPromise: Promise<void> | null = null;
-
 export async function renderLogo(): Promise<void> {
-  if (_logoRendered || _logoRenderPromise) {
-    await _logoRenderPromise;
-    return;
-  }
-
-  _logoRenderPromise = (async () => {
-    try {
-      const iconPath = getIconPath('large');
-      if (!fs.existsSync(iconPath)) {
-        console.log(ASCII_LOGO);
-        _logoRendered = true;
-        return;
-      }
-
-      const { default: terminalImage } = await import('terminal-image');
-      const termWidth = getTerminalWidth();
-      const imgWidth = Math.min(38, Math.max(24, Math.floor(termWidth * 0.45)));
-      const rendered = await terminalImage.file(iconPath, {
-        width: imgWidth,
-        preserveAspectRatio: true,
-      });
-      console.log(rendered);
-      _logoRendered = true;
-    } catch {
-      console.log(ASCII_LOGO);
-      _logoRendered = true;
-    }
-  })();
-
-  await _logoRenderPromise;
+  if (_logoRendered) return;
+  console.log(ASCII_LOGO);
+  _logoRendered = true;
 }
 
 function getTerminalWidth(): number {
@@ -356,7 +322,7 @@ console.log(brand(c.bold('  \u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510')
 console.log(brand(c.bold('  \u2502')) + brand(c.bold(' ' + title + ' '.repeat(boxInnerWidth - title.length - 1))) + brand(c.bold('\u2502')));
 console.log(brand(c.bold('  \u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524')));
   for (const item of items) {
-    const label = item.highlight ? c.bold(item.label) : c.dim(item.label);
+    const label = item.highlight ? c.bold(brand(item.label)) : c.dim(item.label);
     const paddedLabel = label + ' '.repeat(Math.max(0, maxLabel - stripAnsi(item.label).length + 2));
 
     // Truncate value if too long, accounting for ANSI codes

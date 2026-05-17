@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { banner, success, error, info, warn, kvLine, c, icons } from '../utils/ui.js';
+import { banner, success, error, info, warn, kvLine, c } from '../utils/ui.js';
 import {
   generateKeyPair,
   publicKeyFingerprint,
@@ -15,7 +15,7 @@ export const keygenCommand = new Command('keygen')
   .option('-n, --name <name>', 'Key name under ~/.bugproof/keys', DEFAULT_KEY_NAME)
   .option('--force', 'Overwrite existing keys with the same name')
   .action((options) => {
-    banner(`${icons.arrow} BugProof Keygen`);
+    banner('Keygen');
 
     const pubPath = path.join(KEY_DIR, `${options.name}.pub`);
     const privPath = path.join(KEY_DIR, `${options.name}.key`);
