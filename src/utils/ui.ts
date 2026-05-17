@@ -270,7 +270,6 @@ export function summaryBox(title: string, items: { label: string; value: string;
 
   console.log();
   const boxInnerWidth = labelPad + Math.min(maxValWidth, 60);
-  const totalWidth = boxInnerWidth + borderChars;
 
   console.log(c.cyan(c.bold('  \u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510')));
   console.log(c.cyan(c.bold('  \u2502')) + c.cyan(c.bold(' ' + title + ' '.repeat(boxInnerWidth - title.length - 1))) + c.cyan(c.bold('\u2502')));
@@ -295,5 +294,6 @@ export function summaryBox(title: string, items: { label: string; value: string;
 
 /** Strip ANSI escape codes from a string for length calculation */
 function stripAnsi(str: string): string {
-  return str.replace(/\x1b\[[0-9;]*m/g, '');
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\u001b\[[0-9;]*m/g, '');
 }
