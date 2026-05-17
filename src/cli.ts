@@ -62,9 +62,13 @@ function showFirstRunWelcome(): void {
   try { fs.writeFileSync(markerPath, VERSION); } catch { /* ignore */ }
 }
 
-// If called with no arguments, show welcome on first run then help
+// Show welcome on first run, then show help on subsequent no-arg invocations
 if (process.argv.length <= 2) {
-  showFirstRunWelcome();
+  if (!fs.existsSync(path.join(os.homedir(), '.bugproof-welcomed'))) {
+    showFirstRunWelcome();
+    process.exit(0);
+  }
+  // After first run, bare `bugproof` shows help
 }
 
 const program = new Command();
