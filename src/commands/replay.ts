@@ -326,10 +326,14 @@ export const replayCommand = new Command('replay')
           }
         }
 
+        const exitMatch = expectedFailure.exit_code === replayResult.actualFailure.exit_code;
+        const exitLabel = exitMatch
+          ? c.green(`exit ${replayResult.actualFailure.exit_code} (match)`)
+          : c.red(`expected ${expectedFailure.exit_code}, got ${replayResult.actualFailure.exit_code}`);
+
         summaryBox('Replay Verdict', [
-          { label: 'Expected exit', value: String(expectedFailure.exit_code) },
-          { label: 'Actual exit', value: String(replayResult.actualFailure.exit_code) },
           { label: 'Verdict', value: verdict.message, highlight: verdict.status === 'confirmed' },
+          { label: 'Exit code', value: exitLabel },
           ...(replayResult.sourceType ? [{ label: 'Source', value: replayResult.sourceType }] : []),
           ...(replayResult.fallbackReason ? [{ label: 'Note', value: c.yellow(replayResult.fallbackReason) }] : []),
           ...(replayResult.bugBox && replayResult.bugBox.level !== 'workspace' ? [
