@@ -62,15 +62,11 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-/** ASCII art logo for --help and first-run experience (3-line compact form) */
-export const ASCII_LOGO = `
-  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588\u2588 
-  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588    \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588   
-  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588 
-`.trim();
+/** Professional text logo for banners */
+export const ASCII_LOGO = `BugProof`;
 
 /** Compact logo for banners */
-export const COMPACT_LOGO = `${c.cyan(c.bold('  \uD83E\uDEB2  BugProof'))}`;
+export const COMPACT_LOGO = `${c.cyan(c.bold('BugProof'))}`;
 
 function getTerminalWidth(): number {
   if (isTTY && process.stdout.columns) return process.stdout.columns;
@@ -81,18 +77,18 @@ function line(len: number): string {
   return c.dim(icons.divider.repeat(Math.max(0, len)));
 }
 
-/** Animated banner with compact logo */
+/** Animated banner with compact logo — no ASCII art, clean professional look */
 export function banner(text: string): void {
   const width = getTerminalWidth();
   console.log();
-  console.log(COMPACT_LOGO + c.dim('  ' + text));
-  console.log(line(width - 2));
+  console.log(`${c.cyan(c.bold('  BugProof'))}${c.dim('  ' + text)}`);
+  console.log(c.dim('  ' + icons.divider.repeat(Math.min(width - 4, 80))));
 }
 
-/** Help banner with full ASCII art */
+/** Help banner — clean, no ASCII art */
 export function helpBanner(): void {
   console.log();
-  console.log(c.cyan(ASCII_LOGO));
+  console.log(c.cyan(c.bold('  BugProof')));
   console.log(c.dim('  ') + c.bold('Executable bugs, not bug reports.'));
   console.log();
 }
@@ -261,31 +257,43 @@ export function table(headers: string[], rows: string[][], colWidths?: number[])
   }
 }
 
-/** Summary box for final output */
+/** Summary box for final output — fixed alignment and truncation */
 export function summaryBox(title: string, items: { label: string; value: string; highlight?: boolean }[]): void {
   if (items.length === 0) return;
   const width = getTerminalWidth();
-  const maxLabel = Math.max(...items.map(i => i.label.length));
-  // Calculate box width: reserve space for borders (4), label, padding (4), and value
-  const maxContentWidth = width - 8;
-  const boxWidth = Math.max(title.length + 4, Math.min(maxContentWidth, maxLabel + 4 + 40));
+  const maxLabel = Math.max(...items.map(i => stripAnsi(i.label).length));
+  const labelPad = maxLabel + 2;
+
+  // Calculate available width for values
+  const borderChars = 4; // left border + space + space + right border
+  const maxValWidth = width - borderChars - labelPad;
 
   console.log();
-  console.log(c.cyan(c.bold('  \u250C' + '\u2501'.repeat(boxWidth) + '\u2510')));
-  console.log(c.cyan(c.bold('  \u2502')) + c.cyan(c.bold(' ' + title.padEnd(boxWidth - 1))) + c.cyan(c.bold('\u2502')));
-  console.log(c.cyan(c.bold('  \u251C' + '\u2500'.repeat(boxWidth) + '\u2524')));
+  const boxInnerWidth = labelPad + Math.min(maxValWidth, 60);
+  const totalWidth = boxInnerWidth + borderChars;
+
+  console.log(c.cyan(c.bold('  \u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510')));
+  console.log(c.cyan(c.bold('  \u2502')) + c.cyan(c.bold(' ' + title + ' '.repeat(boxInnerWidth - title.length - 1))) + c.cyan(c.bold('\u2502')));
+  console.log(c.cyan(c.bold('  \u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524')));
   for (const item of items) {
-    const label = item.highlight ? c.bold(item.label.padEnd(maxLabel)) : c.dim(item.label.padEnd(maxLabel));
-    // Truncate value to fit within box, leaving room for label, padding, and border
-    const maxValLen = boxWidth - maxLabel - 6;
-    let value = item.value;
-    if (value.length > maxValLen && maxValLen > 3) {
-      value = value.slice(0, maxValLen - 3) + c.dim('...');
+    const label = item.highlight ? c.bold(item.label) : c.dim(item.label);
+    const paddedLabel = label + ' '.repeat(Math.max(0, maxLabel - stripAnsi(item.label).length + 2));
+
+    // Truncate value if too long, accounting for ANSI codes
+    const rawValue = stripAnsi(item.value);
+    let displayValue = item.value;
+    if (rawValue.length > maxValWidth && maxValWidth > 6) {
+      displayValue = item.value.slice(0, maxValWidth - 3) + c.dim('...');
     }
-    const displayValue = item.highlight ? c.cyan(c.bold(value)) : value;
-    const line = ` ${label}  ${displayValue}`;
-    console.log(c.cyan(c.bold('  \u2502')) + line.padEnd(boxWidth) + c.cyan(c.bold('\u2502')));
+
+    const lineContent = ` ${paddedLabel}${displayValue}`;
+    console.log(c.cyan(c.bold('  \u2502')) + lineContent + ' '.repeat(Math.max(0, boxInnerWidth - stripAnsi(lineContent).length)) + c.cyan(c.bold('\u2502')));
   }
-  console.log(c.cyan(c.bold('  \u2514' + '\u2501'.repeat(boxWidth) + '\u2518')));
+  console.log(c.cyan(c.bold('  \u2514' + '\u2501'.repeat(boxInnerWidth) + '\u2518')));
   console.log();
+}
+
+/** Strip ANSI escape codes from a string for length calculation */
+function stripAnsi(str: string): string {
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
 }

@@ -7,6 +7,20 @@ and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.1.28] - 2026-05-17 (Terminal UI Polish)
+
+### Fixed
+
+- Removed ASCII art logo from `--help` output; replaced with clean professional text banner.
+- Fixed double bug emoji in capture/replay headers.
+- Secret detection no longer lists individual key names in output; shows generic warning only.
+- Replay now shows command stdout/stderr output before verdict box.
+- Summary box table formatting fixed — proper alignment, no truncation issues.
+- Postinstall script now shows branded welcome banner with quick start commands.
+- Java dummy projects fixed: single quotes replaced with double quotes for valid Java syntax.
+
+---
+
 ## [1.1.26] - 2026-05-16 (Comprehensive Validation Release)
 
 ### Added

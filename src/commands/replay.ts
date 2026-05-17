@@ -53,7 +53,7 @@ export const replayCommand = new Command('replay')
       process.exit(1);
     }
 
-    if (!jsonMode) banner(`${icons.arrow} BugProof Replay`);
+    if (!jsonMode) banner('BugProof Replay');
 
     const stat = fs.statSync(artifact);
     let targetPath = artifact;
@@ -294,6 +294,33 @@ export const replayCommand = new Command('replay')
           success(c.bold(c.green('REPRODUCTION CONFIRMED')));
         } else {
           error(c.bold(c.red('NOT REPRODUCED')));
+        }
+
+        // Show replay output (stdout/stderr) before verdict box
+        if (replayResult.actualStdout || replayResult.actualStderr) {
+          section('Replay Output');
+          if (replayResult.actualStdout) {
+            console.log(c.dim('  [stdout]'));
+            const lines = replayResult.actualStdout.split('\n').slice(0, 30);
+            for (const line of lines) {
+              console.log(`    ${line}`);
+            }
+            if (replayResult.actualStdout.split('\n').length > 30) {
+              console.log(c.dim(`    ... (${replayResult.actualStdout.split('\n').length - 30} more lines)`));
+            }
+            console.log();
+          }
+          if (replayResult.actualStderr) {
+            console.log(c.dim('  [stderr]'));
+            const lines = replayResult.actualStderr.split('\n').slice(0, 30);
+            for (const line of lines) {
+              console.log(`    ${c.red(line)}`);
+            }
+            if (replayResult.actualStderr.split('\n').length > 30) {
+              console.log(c.dim(`    ... (${replayResult.actualStderr.split('\n').length - 30} more lines)`));
+            }
+            console.log();
+          }
         }
 
         summaryBox('Replay Verdict', [

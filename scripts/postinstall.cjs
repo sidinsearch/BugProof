@@ -218,6 +218,12 @@ function registerMacAssociation() {
 
 function main() {
   try {
+    // Show welcome banner
+    console.log();
+    console.log('\x1b[36m\x1b[1m  BugProof\x1b[22m\x1b[39m');
+    console.log('\x1b[2m  Executable bugs, not bug reports.\x1b[22m');
+    console.log();
+
     log('Starting install checks...');
     checkNodeVersion();
     checkGit();
@@ -232,6 +238,12 @@ function main() {
     registerLinuxAssociation();
     registerMacAssociation();
 
+    console.log();
+    console.log('\x1b[2m  Quick start:\x1b[22m');
+    console.log('    \x1b[36mbugproof capture\x1b[39m \x1b[2m-- node -e "throw new Error(\'demo\')"\x1b[22m');
+    console.log('    \x1b[36mbugproof replay\x1b[39m  \x1b[2m<artifact>.bug\x1b[22m');
+    console.log('    \x1b[36mbugproof --help\x1b[39m  \x1b[2mfor all commands\x1b[22m');
+    console.log();
     log('Install checks complete.');
   } catch (err) {
     log(`WARNING: postinstall completed with non-fatal error: ${err instanceof Error ? err.message : String(err)}`);

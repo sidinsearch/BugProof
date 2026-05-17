@@ -63,7 +63,7 @@ export const captureCommand = new Command('capture')
       ? path.resolve(options.output)
       : path.resolve(config.outputDir);
 
-    if (!jsonMode) banner(`${icons.bug} BugProof Capture`);
+    if (!jsonMode) banner('BugProof Capture');
 
     // 1. Detect secrets
     const secrets = options.skipSecrets
@@ -71,10 +71,7 @@ export const captureCommand = new Command('capture')
       : scanEnvironmentForSecrets(process.env);
 
     if (!jsonMode && secrets.hasSecrets) {
-      warn(`Secrets detected in environment (will be redacted):`);
-      for (const k of secrets.detectedKeys) {
-        console.log(`    ${c.yellow(icons.dot)} ${k}`);
-      }
+      warn(`Secrets detected in environment (will be redacted)`);
       console.log();
     }
 
