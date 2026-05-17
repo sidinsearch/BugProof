@@ -55,6 +55,7 @@
     "archiver": "^7.0.1",
     "commander": "^14.0.0",
     "extract-zip": "^2.0.1",
+    "figlet": "^1.11.0",
     "https-proxy-agent": "^9.0.0",
     "terminal-image": "^4.3.0"
   },

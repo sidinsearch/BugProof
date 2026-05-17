@@ -2,6 +2,7 @@
  * BugProof Terminal UI — Production-grade CLI output.
  *
  * Features:
+ * - Dynamic ASCII art logo via figlet (multiple fonts)
  * - Terminal image logo (iTerm2/Sixel/Kitty/Unicode fallback)
  * - Terminal-width-aware section dividers
  * - Semantic color hierarchy (brand cyan, success green, warning yellow, error red)
@@ -15,6 +16,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import figlet from 'figlet';
 
 const isColorSupported = process.stdout.isTTY && !process.env['NO_COLOR'];
 const isTTY = process.stdout.isTTY;
@@ -65,25 +67,36 @@ export const icons = {
   watch:    isColorSupported ? '\uD83D\uDC41' : '[W]',
 };
 
-/** ASCII art logo fallback for terminals that don't support images */
-export const ASCII_LOGO = `
-  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588\u2588 
-  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588    \u2588\u2588    \u2588\u2588 \u2588\u2588\u2588\u2588\u2588   
-  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588\u2588 
-`.trim();
+/** Default figlet font for ASCII art */
+const FIGLET_FONT = 'ANSI Shadow';
+
+/** Generate ASCII art via figlet with fallback */
+export function generateAsciiArt(text: string = 'BugProof'): string {
+  try {
+    return figlet.textSync(text, { font: FIGLET_FONT });
+  } catch {
+    // Ultimate fallback — simple text
+    return text;
+  }
+}
+
+/** ASCII_LOGO is now dynamically generated */
+export const ASCII_LOGO = generateAsciiArt();
 
 /** Compact logo for banners */
 export const COMPACT_LOGO = `${c.cyan(c.bold('\uD83E\uDEB2  BugProof'))}`;
 
 /** Resolve the icon path from the package assets directory */
 function getIconPath(size: 'small' | 'large' = 'large'): string {
-  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
-  const rootDir = path.resolve(scriptDir, '..', '..');
+  // __dirname works in both CommonJS (Jest) and ESM (via ts-jest transformation)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dir = typeof __dirname !== 'undefined' ? __dirname : (globalThis as any).__dirname || '.';
+  const rootDir = path.resolve(dir, '..', '..');
   const filename = size === 'small' ? 'icon-32x32.png' : 'icon-512x512.png';
   return path.join(rootDir, 'assets', filename);
 }
 
-/** Render the BugProof logo image in the terminal with fallback */
+/** Render the BugProof logo image in the terminal with figlet ASCII fallback */
 let _logoRendered = false;
 let _logoRenderPromise: Promise<void> | null = null;
 
@@ -97,13 +110,12 @@ export async function renderLogo(): Promise<void> {
     try {
       const iconPath = getIconPath('large');
       if (!fs.existsSync(iconPath)) {
-        console.log(c.cyan(ASCII_LOGO));
+        console.log(c.cyan(generateAsciiArt()));
         _logoRendered = true;
         return;
       }
 
       const { default: terminalImage } = await import('terminal-image');
-      // Scale 512x512 to fit terminal width (30-40 columns)
       const termWidth = getTerminalWidth();
       const imgWidth = Math.min(38, Math.max(24, Math.floor(termWidth * 0.45)));
       const rendered = await terminalImage.file(iconPath, {
@@ -113,7 +125,8 @@ export async function renderLogo(): Promise<void> {
       console.log(rendered);
       _logoRendered = true;
     } catch {
-      console.log(c.cyan(ASCII_LOGO));
+      // Fallback to figlet ASCII art
+      console.log(c.cyan(generateAsciiArt()));
       _logoRendered = true;
     }
   })();
