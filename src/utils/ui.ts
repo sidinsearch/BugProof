@@ -76,11 +76,11 @@ export const ASCII_LOGO = `
 export const COMPACT_LOGO = `${c.cyan(c.bold('\uD83E\uDEB2  BugProof'))}`;
 
 /** Resolve the icon path from the package assets directory */
-function getIconPath(): string {
+function getIconPath(size: 'small' | 'large' = 'large'): string {
   const scriptDir = path.dirname(new URL(import.meta.url).pathname);
-  // dist/utils/ -> dist/ -> root/
   const rootDir = path.resolve(scriptDir, '..', '..');
-  return path.join(rootDir, 'assets', 'icon-512x512.png');
+  const filename = size === 'small' ? 'icon-32x32.png' : 'icon-512x512.png';
+  return path.join(rootDir, 'assets', filename);
 }
 
 /** Render the BugProof logo image in the terminal with fallback */
@@ -95,24 +95,24 @@ export async function renderLogo(): Promise<void> {
 
   _logoRenderPromise = (async () => {
     try {
-      const iconPath = getIconPath();
+      const iconPath = getIconPath('large');
       if (!fs.existsSync(iconPath)) {
-        // Fallback: print ASCII logo
         console.log(c.cyan(ASCII_LOGO));
         _logoRendered = true;
         return;
       }
 
-      // Try terminal-image for proper image rendering
       const { default: terminalImage } = await import('terminal-image');
+      // Scale 512x512 to fit terminal width (30-40 columns)
+      const termWidth = getTerminalWidth();
+      const imgWidth = Math.min(38, Math.max(24, Math.floor(termWidth * 0.45)));
       const rendered = await terminalImage.file(iconPath, {
-        width: 32,
+        width: imgWidth,
         preserveAspectRatio: true,
       });
       console.log(rendered);
       _logoRendered = true;
     } catch {
-      // Fallback to ASCII art on any failure
       console.log(c.cyan(ASCII_LOGO));
       _logoRendered = true;
     }
