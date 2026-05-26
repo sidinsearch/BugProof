@@ -27,7 +27,6 @@ const VERSION = getBugProofVersion();
 export const captureCommand = new Command('capture')
   .description('Capture a failing command as a .bug artifact')
   .allowUnknownOption(true)
-  .passThroughOptions()
   .option('--include-untracked', 'Include untracked files (git ls-files -o)')
   .option('--skip-secrets', "Don't scan for secrets; skip confirmation")
   .option('--timeout <ms>', 'Command timeout in milliseconds', '300000')
@@ -43,23 +42,57 @@ export const captureCommand = new Command('capture')
   .option('--sign [key]', 'Cryptographically sign the artifact (Ed25519). Optional: named key or path to .key file')
   .option('--signer <identity>', 'Human-readable signer identity to embed (email, gist URL, etc.)')
   .option('--force-include', 'Override the 100MB/10k file hardware limit and include all source files')
+  .option('--include-compiled', 'Include compiled artifacts (.class, .jar, .pyc, etc.) for compiled language replay')
   .argument('[command...]', 'The command to run and capture')
   .action(async (commandTokens: string[], options) => {
     const jsonMode = options.json === true;
 
-    // Fix: manually extract command tokens after '--' to avoid flag collision
-    // (e.g., 'gcc -o output input.c' where -o would be parsed as --output)
-    const rawArgs = process.argv.slice(3); // skip 'node', 'cli.js', 'capture'
-    const dashDashIndex = rawArgs.indexOf('--');
-    let effectiveCommandTokens = commandTokens;
-    let outputOverriddenByCommand = false;
-    if (dashDashIndex >= 0) {
-      effectiveCommandTokens = rawArgs.slice(dashDashIndex + 1);
-      // If -o/--output appeared after '--', it was part of the captured command, not a BugProof option
-      // Check if any -o/--output tokens exist after '--'
-      const afterDashDash = rawArgs.slice(dashDashIndex + 1);
-      outputOverriddenByCommand = afterDashDash.some(arg => arg === '-o' || arg.startsWith('--output'));
+    // Parse all arguments manually to support flags anywhere in the command line
+    // This solves the PowerShell issue where flags after '--' were treated as command tokens
+    const allArgs = process.argv.slice(3); // skip 'node', 'cli.js', 'capture'
+    
+    // Known BugProof flags (with and without values)
+    const flagValues = new Map<string, number>([
+      ['--timeout', 1], ['--name', 1], ['-n', 1],
+      ['--description', 1], ['-d', 1], ['--output', 1], ['-o', 1],
+      ['--exclude', 1], ['-x', 1], ['--sign', 1], ['--signer', 1],
+    ]);
+    const knownFlags = new Set([
+      ...flagValues.keys(),
+      '--include-untracked', '--skip-secrets', '--json', '--container',
+      '--force-include', '--include-compiled', '--help', '-h', '--'
+    ]);
+    
+    const commandOnly: string[] = [];
+    let i = 0;
+    while (i < allArgs.length) {
+      const arg = allArgs[i];
+      
+      if (arg === '--') {
+        // Skip '--' separator, rest is command
+        i += 1;
+        continue;
+      }
+      
+      if (knownFlags.has(arg)) {
+        // Skip this flag and its value if applicable
+        const valueCount = flagValues.get(arg) || 0;
+        i += 1 + valueCount;
+      } else if (arg.startsWith('--') || (arg.startsWith('-') && arg.length > 1)) {
+        // Unknown flag-like argument - treat as part of command
+        commandOnly.push(arg);
+        i += 1;
+      } else {
+        // Regular argument - part of command
+        commandOnly.push(arg);
+        i += 1;
+      }
     }
+    
+    const effectiveCommandTokens = commandOnly.length > 0 ? commandOnly : commandTokens;
+    
+    // Check if -o/--output appeared in command tokens (not as a BugProof flag)
+    const outputOverriddenByCommand = effectiveCommandTokens.some(arg => arg === '-o' || arg.startsWith('--output'));
 
     if (!effectiveCommandTokens || effectiveCommandTokens.length === 0) {
       if (jsonMode) {
@@ -289,6 +322,7 @@ export const captureCommand = new Command('capture')
         signingKey,
         signer: options.signer,
         forceInclude: options.forceInclude,
+        includeCompiled: options.includeCompiled,
       });
 
       if (jsonMode) {

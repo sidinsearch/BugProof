@@ -68,14 +68,26 @@ const ALWAYS_EXCLUDE_DIRS = [
   'bin', 'obj', 'packages', '.dart_tool',
 ];
 
-/** File extensions to skip (binary/compiled) */
+/** File extensions to skip (binary/compiled) — but NOT compiled language artifacts */
 const SKIP_EXTENSIONS = new Set([
-  '.exe', '.dll', '.so', '.dylib', '.o', '.obj', '.class',
-  '.jar', '.war', '.zip', '.tar', '.gz', '.7z', '.rar',
+  '.exe', '.dll', '.so', '.dylib', '.o', '.obj',
+  '.zip', '.tar', '.gz', '.7z', '.rar',
   '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg',
   '.mp3', '.mp4', '.avi', '.mov', '.woff', '.woff2', '.ttf',
   '.eot', '.pdf', '.psd', '.ai', '.sketch',
   '.pyc', '.pyo', '.wasm', '.node',
+]);
+
+/** Compiled language artifact extensions that SHOULD be included for replay */
+const COMPILED_ARTIFACT_EXTENSIONS = new Set([
+  '.class',    // Java
+  '.jar',      // Java archives
+  '.war',      // Java web archives
+  '.ear',      // Java enterprise archives
+  '.pyc',      // Python bytecode (include for replay)
+  '.pyo',      // Python optimized bytecode
+  '.wasm',     // WebAssembly
+  '.node',     // Node.js native addons
 ]);
 
 /**

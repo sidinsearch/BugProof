@@ -18,6 +18,30 @@ import {
   signPayload,
 } from '../utils/signing.js';
 
+/** Compiled language artifact extensions to include */
+const COMPILED_EXTENSIONS = new Set([
+  '.class',    // Java
+  '.jar',      // Java archives
+  '.war',      // Java web archives
+  '.ear',      // Java enterprise archives
+  '.pyc',      // Python bytecode
+  '.pyo',      // Python optimized bytecode
+  '.wasm',     // WebAssembly
+  '.node',     // Node.js native addons
+]);
+
+/** Common build directories to scan for compiled artifacts */
+const BUILD_DIRS = [
+  'target',        // Maven/Gradle
+  'build',         // Gradle/CMake
+  'out',           // IntelliJ/VS
+  'bin',           // .NET/C#
+  'dist',          // Various
+  '__pycache__',   // Python
+  '.next',         // Next.js
+  '.nuxt',         // Nuxt.js
+];
+
 export interface BuildManifestOptions {
   name: string;
   description: string;
@@ -115,6 +139,8 @@ export interface PackageOptions {
   maxArtifactSizeMB?: number;
   /** Override the hardware limit and include all source files */
   forceInclude?: boolean;
+  /** Include compiled language artifacts (.class, .jar, .pyc, etc.) */
+  includeCompiled?: boolean;
 }
 
 export interface FileEntry {
@@ -159,6 +185,7 @@ export async function packageArtifact(
       options.sourceStrategy,
       options.maxArtifactSizeMB ?? 100,
       options.forceInclude ?? false,
+      options.includeCompiled ?? false,
     );
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
@@ -279,6 +306,7 @@ function copySourceFiles(
   sourceStrategy?: SourceStrategyResult,
   maxArtifactSizeMB = 100,
   forceInclude = false,
+  includeCompiled = false,
 ): FileEntry[] {
   const maxArtifactSize = maxArtifactSizeMB * 1024 * 1024;
   const warnThreshold = maxArtifactSize;
@@ -310,6 +338,12 @@ function copySourceFiles(
   // Apply --exclude patterns
   if (excludePatterns.length > 0) {
     relativePaths = filterByExcludePatterns(relativePaths, excludePatterns);
+  }
+
+  // Include compiled artifacts if requested
+  if (includeCompiled) {
+    const compiledPaths = findCompiledArtifacts(workingDir);
+    relativePaths = [...new Set([...relativePaths, ...compiledPaths])];
   }
 
   const entries: FileEntry[] = [];
@@ -380,4 +414,50 @@ function copySourceFiles(
   }
 
   return entries;
+}
+
+/**
+ * Find compiled language artifacts in common build directories.
+ */
+function findCompiledArtifacts(workingDir: string): string[] {
+  const compiled: string[] = [];
+  const maxIndividualSize = 50 * 1024 * 1024; // 50MB per file
+
+  function scanDir(dir: string, relativeBase: string): void {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const name = entry.name;
+      const relPath = relativeBase ? `${relativeBase}/${name}` : name;
+
+      if (entry.isSymbolicLink()) continue;
+
+      if (entry.isDirectory()) {
+        // Scan build directories
+        if (BUILD_DIRS.includes(name)) {
+          scanDir(path.join(dir, name), relPath);
+        }
+      } else if (entry.isFile()) {
+        const ext = path.extname(name).toLowerCase();
+        if (COMPILED_EXTENSIONS.has(ext)) {
+          try {
+            const stat = fs.statSync(path.join(dir, name));
+            if (stat.size <= maxIndividualSize) {
+              compiled.push(relPath);
+            }
+          } catch {
+            // Skip unreadable files
+          }
+        }
+      }
+    }
+  }
+
+  scanDir(workingDir, '');
+  return compiled;
 }
