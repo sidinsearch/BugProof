@@ -112,6 +112,7 @@ TROUBLESHOOTING.md
 .env
 .env.local
 .env.*.local
+.env.example
 .eslintrc
 .prettierrc
 
