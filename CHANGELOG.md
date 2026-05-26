@@ -7,6 +7,25 @@ and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.2.7] - 2026-05-26 (Cross-Platform Replay Hardening)
+
+### Fixed
+
+- **Robust cross-platform replay**: Runtime-aware command translation with `detectAvailableRuntimes()`.
+- **Python cross-platform**: `python3 → python → py` fallback chain on Windows; `python → python3` on Linux/macOS.
+- **Windows Store redirect detection**: `commandExists()` now validates commands actually run, not just exist (fixes false-positive `python3` detection on Windows).
+- **Cross-platform error pattern normalization**: Verdict module normalizes paths and line endings for accurate cross-platform fingerprint comparison.
+- **COMMAND_MAP uses arrays**: Fallback candidates for each command (e.g., `python3` on Windows tries `py` then `python`).
+- Fixed Python test commands in cross-platform test scripts (`python main.py` not `python app.py`).
+
+### Verified
+
+- 40 test suites, 483 tests, 0 failures
+- 100% cross-platform replay: Windows→Windows, Linux→Linux, Windows→Linux, Linux→Windows
+- Node.js, Python, Java all confirmed working across platforms
+
+---
+
 ## [1.2.6] - 2026-05-26 (Cross-Platform Validation Release)
 
 ### Fixed
