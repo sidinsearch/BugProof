@@ -101,7 +101,7 @@ The action lives at `.github/actions/bugproof-action/action.yml` in this repo. R
 
 ## MCP Server — AI-Agent Integration
 
-BugProof ships a built-in **MCP (Model Context Protocol) server** that exposes capture, replay, inspect, and diff as tools any MCP-compatible host can call. Listed on the [Official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.sidinsearch/bugproof`.
+BugProof ships a built-in **MCP (Model Context Protocol) server** that exposes 10 tools plus Resources and Prompts for AI agents. Listed on the [Official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.sidinsearch/bugproof`.
 
 ### Setup
 
@@ -178,6 +178,27 @@ If you already have bugproof globally (`npm install -g bugproof`), omit `npx -y`
 | `inspect` | Show artifact metadata | "What's in this .bug file without running it?" |
 | `diff` | Compare two artifacts | "Compare the CI capture with my local capture — what's different?" |
 | `doctor` | Check sandbox capabilities | "Does this machine support full sandbox isolation?" |
+| `share` | Share artifact via GitHub Gist | "Share this bug with my team" |
+| `pull` | Download artifact from Gist | "Pull the bug artifact from this URL" |
+| `watch` | Auto-capture on command failure | "Watch npm test and capture if it fails" |
+| `list` | List .bug artifacts in directory | "Show me all bug artifacts in this project" |
+| `clean` | Remove .bug artifacts | "Clean up old bug artifacts from this directory" |
+
+### Resources
+
+AI agents can read .bug artifact contents directly via resource URIs:
+
+- `bugproof://artifact/{path}` — Read the raw .bug artifact (base64-encoded ZIP)
+
+### Prompts
+
+Pre-built workflows for common AI agent tasks:
+
+| Prompt | Description |
+|---|---|
+| `capture-failure` | Guide to capture a failing command as a .bug artifact |
+| `replay-and-analyze` | Replay an artifact and analyze the root cause |
+| `compare-bugs` | Compare two artifacts to find differences |
 
 ### Example AI session
 
@@ -189,7 +210,7 @@ Agent:  [calls bugproof capture -- npm test -- --run flaky-suite]
          Redis-unreachable pattern. Here's the captured stderr..."
 ```
 
-The MCP server communicates over **stdio** (JSON-RPC 2.0). It shells out to the local `bugproof` CLI with `--json` output and returns structured results. If bugproof isn't installed, `npx -y` fetches it from npmjs.org — no global install required.
+The MCP server communicates over **stdio** (JSON-RPC 2.0). It shells out to the local `bugproof` CLI with `--json` output and returns structured results with both human-readable summaries and raw data. If bugproof isn't installed, `npx -y` fetches it from npmjs.org — no global install required.
 
 ---
 

@@ -3,7 +3,7 @@
   "name": "io.github.sidinsearch/bugproof",
   "title": "BugProof",
   "description": "Capture, replay, and debug failures with portable, executable bug artifacts",
-  "version": "1.2.7",
+      "version": "1.3.0",
   "websiteUrl": "https://github.com/sidinsearch/BugProof",
   "repository": {
     "url": "https://github.com/sidinsearch/BugProof",
@@ -39,13 +39,33 @@
     {
       "name": "doctor",
       "description": "Check if bugproof sandbox capabilities are available"
+    },
+    {
+      "name": "share",
+      "description": "Share a .bug artifact via GitHub Gist and get a shareable URL"
+    },
+    {
+      "name": "pull",
+      "description": "Download a .bug artifact from a GitHub Gist URL or ID"
+    },
+    {
+      "name": "watch",
+      "description": "Run a command and auto-capture a .bug artifact only if it fails"
+    },
+    {
+      "name": "list",
+      "description": "List .bug artifacts in a directory"
+    },
+    {
+      "name": "clean",
+      "description": "Remove .bug artifacts from a directory"
     }
   ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "bugproof",
-      "version": "1.2.7",
+  "version": "1.3.0",
       "transport": {
         "type": "stdio"
       }

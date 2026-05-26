@@ -73,7 +73,7 @@ describe('MCP Server', () => {
     expect(r.stdout).toContain('MCP server');
   });
 
-  it('mcp should list all 5 tools via tools/list', () => {
+  it('mcp should list all 10 tools via tools/list', () => {
     const { response, stderr } = mcpRequest({
       jsonrpc: '2.0', id: 1, method: 'tools/list',
     });
@@ -82,9 +82,9 @@ describe('MCP Server', () => {
     expect(response!.jsonrpc).toBe('2.0');
     expect(response!.id).toBe(1);
     const result = response!.result as { tools: unknown[] };
-    expect(result.tools).toHaveLength(5);
+    expect(result.tools).toHaveLength(10);
     const names = (result.tools as Array<{ name: string }>).map(t => t.name);
-    expect(names).toEqual(['capture', 'replay', 'inspect', 'diff', 'doctor']);
+    expect(names).toEqual(['capture', 'replay', 'inspect', 'diff', 'doctor', 'share', 'pull', 'watch', 'list', 'clean']);
   });
 
   it('mcp should respond to initialize request', () => {
@@ -134,10 +134,10 @@ describe('MCP Server', () => {
     expect(response).not.toBeNull();
     expect(response!.jsonrpc).toBe('2.0');
     expect(response!.id).toBe(4);
-    const result = response!.result as { host: { os: string; platform: string } };
+    const result = response!.result as { _data: { host: { os: string; platform: string } } };
     expect(result).toBeDefined();
-    expect(result.host).toBeDefined();
-    expect(['win32', 'linux', 'darwin']).toContain(result.host.platform);
+    expect(result._data.host).toBeDefined();
+    expect(['win32', 'linux', 'darwin']).toContain(result._data.host.platform);
   });
 
   it('should error for unknown tool name (-32601)', () => {
@@ -198,10 +198,10 @@ describe('MCP Server', () => {
     });
     expect(response).not.toBeNull();
     expect(response!.error).toBeUndefined();
-    const result = response!.result as { manifest: { name: string; exit_code: number } };
-    expect(result.manifest).toBeDefined();
-    expect(result.manifest.name).toBe('mcp-test-1');
-    expect(result.manifest.exit_code).toBe(1);
+    const result = response!.result as { _data: { manifest: { name: string; exit_code: number } } };
+    expect(result._data.manifest).toBeDefined();
+    expect(result._data.manifest.name).toBe('mcp-test-1');
+    expect(result._data.manifest.exit_code).toBe(1);
   });
 
   it('diff tool should compare two artifacts', () => {
@@ -211,9 +211,9 @@ describe('MCP Server', () => {
     });
     expect(response).not.toBeNull();
     expect(response!.error).toBeUndefined();
-    const result = response!.result as { identical: boolean; changes: unknown[] };
-    expect(result.identical).toBe(false);
-    expect(result.changes.length).toBeGreaterThanOrEqual(1);
+    const result = response!.result as { _data: { identical: boolean; changes: unknown[] } };
+    expect(result._data.identical).toBe(false);
+    expect(result._data.changes.length).toBeGreaterThanOrEqual(1);
   });
 
   it('replay tool should reproduce a failure', () => {
@@ -223,9 +223,9 @@ describe('MCP Server', () => {
     });
     expect(response).not.toBeNull();
     expect(response!.error).toBeUndefined();
-    const result = response!.result as { reproduced: boolean; verdict: { status: string } };
-    expect(result.reproduced).toBe(true);
-    expect(result.verdict.status).toBe('confirmed');
+    const result = response!.result as { _data: { reproduced: boolean; verdict: { status: string } } };
+    expect(result._data.reproduced).toBe(true);
+    expect(result._data.verdict.status).toBe('confirmed');
   });
 
   it('tools/notifications is not supported (responds with result null)', () => {
@@ -243,15 +243,151 @@ describe('MCP Server', () => {
     });
     expect(response).not.toBeNull();
     expect(response!.error).toBeUndefined();
-    const result = response!.result as Record<string, unknown>;
-    const rSuccess = result.success as boolean;
-    const rArtifact = result.artifact as Record<string, string>;
-    const rFailure = result.failure as Record<string, number>;
+    const result = response!.result as { _data: Record<string, unknown> };
+    const data = result._data;
+    const rSuccess = data.success as boolean;
+    const rArtifact = data.artifact as Record<string, string>;
+    const rFailure = data.failure as Record<string, number>;
     expect(rSuccess).toBe(true);
     expect(rArtifact.name).toBe('mcp-capture-e2e');
     expect(rFailure.exit_code).toBe(42);
 
     // Clean up the captured artifact
     try { fs.unlinkSync(path.resolve(rArtifact.path)); } catch { /* ok */ }
+  });
+
+  it('share tool should error on nonexistent artifact (-32000)', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 15, method: 'tools/call',
+      params: { name: 'share', arguments: { artifact: '/nonexistent.bug' } },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeDefined();
+    expect(response!.error!.code).toBe(-32000);
+  });
+
+  it('pull tool should error on invalid gist input', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 16, method: 'tools/call',
+      params: { name: 'pull', arguments: { gist: 'invalid-gist-id' } },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeDefined();
+  });
+
+  it('watch tool should capture a failing command', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 17, method: 'tools/call',
+      params: { name: 'watch', arguments: { command: 'node -e process.exit(1)', name: 'mcp-watch-test', skipSecrets: true } },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as Record<string, unknown>;
+    const rCaptured = result.captured as boolean;
+    const rArtifact = result.artifact as Record<string, string>;
+    expect(rCaptured).toBe(true);
+    expect(rArtifact.path).toBeDefined();
+
+    // Clean up
+    try { fs.unlinkSync(path.resolve(rArtifact.path)); } catch { /* ok */ }
+  });
+
+  it('list tool should return artifacts in current directory', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 18, method: 'tools/call',
+      params: { name: 'list', arguments: { directory: __dirname } },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { success: boolean; count: number; artifacts: Array<{ path: string }> };
+    expect(result.success).toBe(true);
+    expect(Array.isArray(result.artifacts)).toBe(true);
+  });
+
+  it('clean tool should dry-run without deleting', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 19, method: 'tools/call',
+      params: { name: 'clean', arguments: { directory: __dirname, dryRun: true } },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { success: boolean; dry_run: boolean; count: number };
+    expect(result.success).toBe(true);
+    expect(result.dry_run).toBe(true);
+    expect(typeof result.count).toBe('number');
+  });
+
+  it('resources/list should return artifact resource template', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 20, method: 'resources/list',
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { resourceTemplates: Array<{ uriTemplate: string; name: string }> };
+    expect(result.resourceTemplates).toBeDefined();
+    expect(result.resourceTemplates.length).toBeGreaterThan(0);
+    expect(result.resourceTemplates[0].uriTemplate).toContain('bugproof://artifact/');
+  });
+
+  it('resources/read should return artifact content for valid URI', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 21, method: 'resources/read',
+      params: { uri: `bugproof://artifact/${encodeURIComponent(artifact1)}` },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { contents: Array<{ uri: string; mimeType: string; blob: string }> };
+    expect(result.contents).toBeDefined();
+    expect(result.contents.length).toBe(1);
+    expect(result.contents[0].mimeType).toBe('application/zip');
+    expect(result.contents[0].blob).toBeDefined();
+  });
+
+  it('resources/read should error on nonexistent artifact', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 22, method: 'resources/read',
+      params: { uri: 'bugproof://artifact/nonexistent.bug' },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeDefined();
+    expect(response!.error!.code).toBe(-32000);
+  });
+
+  it('prompts/list should return available prompts', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 23, method: 'prompts/list',
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { prompts: Array<{ name: string; description: string }> };
+    expect(result.prompts).toBeDefined();
+    expect(result.prompts.length).toBe(3);
+    const names = result.prompts.map(p => p.name);
+    expect(names).toContain('capture-failure');
+    expect(names).toContain('replay-and-analyze');
+    expect(names).toContain('compare-bugs');
+  });
+
+  it('prompts/get should return capture-failure prompt', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 24, method: 'prompts/get',
+      params: { name: 'capture-failure', arguments: { command: 'npm test', name: 'test-bug' } },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeUndefined();
+    const result = response!.result as { messages: Array<{ role: string; content: { type: string; text: string } }> };
+    expect(result.messages).toBeDefined();
+    expect(result.messages.length).toBe(1);
+    expect(result.messages[0].content.text).toContain('npm test');
+  });
+
+  it('prompts/get should error on unknown prompt', () => {
+    const { response } = mcpRequest({
+      jsonrpc: '2.0', id: 25, method: 'prompts/get',
+      params: { name: 'unknown-prompt', arguments: {} },
+    });
+    expect(response).not.toBeNull();
+    expect(response!.error).toBeDefined();
+    expect(response!.error!.code).toBe(-32000);
   });
 });

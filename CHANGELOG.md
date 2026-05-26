@@ -7,6 +7,40 @@ and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.3.0] - 2026-05-26 (MCP Server Expansion — AI Agent Distribution)
+
+### Added
+
+- **5 new MCP tools**: `share`, `pull`, `watch`, `list`, `clean` — full artifact lifecycle for AI agents
+- **MCP Resources**: `bugproof://artifact/{path}` — read raw .bug artifact contents via resource URIs
+- **MCP Prompts**: 3 pre-built workflows — `capture-failure`, `replay-and-analyze`, `compare-bugs`
+- **Content block responses**: AI agents receive both human-readable summaries and structured JSON
+- **server.json updated**: All 10 tools documented for MCP Registry
+
+### MCP Tool Summary (10 tools total)
+
+| Tool | Purpose |
+|---|---|
+| `capture` | Run command, capture as .bug artifact |
+| `replay` | Replay .bug file, return verdict |
+| `inspect` | Show artifact metadata |
+| `diff` | Compare two artifacts |
+| `doctor` | Check sandbox capabilities |
+| `share` | Share artifact via GitHub Gist |
+| `pull` | Download artifact from Gist |
+| `watch` | Auto-capture on command failure |
+| `list` | List .bug artifacts in directory |
+| `clean` | Remove .bug artifacts |
+
+### Verified
+
+- 40 test suites, 494 tests, 0 failures (27 MCP tests, up from 15)
+- All 10 tools tested end-to-end
+- Resources and prompts tested
+- Cross-platform compatibility maintained
+
+---
+
 ## [1.2.7] - 2026-05-26 (Cross-Platform Replay Hardening)
 
 ### Fixed
