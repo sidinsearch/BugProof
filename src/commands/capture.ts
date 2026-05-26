@@ -42,6 +42,7 @@ export const captureCommand = new Command('capture')
   .option('--container', 'Run the command in a BugBox container (lightweight process isolation)')
   .option('--sign [key]', 'Cryptographically sign the artifact (Ed25519). Optional: named key or path to .key file')
   .option('--signer <identity>', 'Human-readable signer identity to embed (email, gist URL, etc.)')
+  .option('--force-include', 'Override the 100MB/10k file hardware limit and include all source files')
   .argument('[command...]', 'The command to run and capture')
   .action(async (commandTokens: string[], options) => {
     const jsonMode = options.json === true;
@@ -287,6 +288,7 @@ export const captureCommand = new Command('capture')
         languageContext: langContext,
         signingKey,
         signer: options.signer,
+        forceInclude: options.forceInclude,
       });
 
       if (jsonMode) {

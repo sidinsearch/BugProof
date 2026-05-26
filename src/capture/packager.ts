@@ -113,6 +113,8 @@ export interface PackageOptions {
   signer?: string;
   /** Maximum artifact size in MB (default: 100) */
   maxArtifactSizeMB?: number;
+  /** Override the hardware limit and include all source files */
+  forceInclude?: boolean;
 }
 
 export interface FileEntry {
@@ -156,6 +158,7 @@ export async function packageArtifact(
       options.excludePatterns ?? [],
       options.sourceStrategy,
       options.maxArtifactSizeMB ?? 100,
+      options.forceInclude ?? false,
     );
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
@@ -275,6 +278,7 @@ function copySourceFiles(
   excludePatterns: string[] = [],
   sourceStrategy?: SourceStrategyResult,
   maxArtifactSizeMB = 100,
+  forceInclude = false,
 ): FileEntry[] {
   const maxArtifactSize = maxArtifactSizeMB * 1024 * 1024;
   const warnThreshold = maxArtifactSize;
@@ -326,13 +330,14 @@ function copySourceFiles(
 
     runningSize += stats.size;
 
-    if (runningSize > maxArtifactSize || entries.length >= MAX_FILE_COUNT) {
+    if (!forceInclude && (runningSize > maxArtifactSize || entries.length >= MAX_FILE_COUNT)) {
       process.stderr.write(
         `\n  [WARNING] Git-tracked files exceed hardware limits (${maxArtifactSizeMB}MB total or 10,000 files).\n` +
         `  Gracefully falling back to "stacktrace-only" mode. The bug artifact will\n` +
         `  contain the command, logs, and environment, but NO source files.\n` +
         `  The limit counts files that would be packaged (git-tracked + untracked),\n` +
-        `  not the entire working tree.\n\n`
+        `  not the entire working tree.\n` +
+        `  Use --force-include to override this limit.\n\n`
       );
       
       // Clean up partially copied files
@@ -342,7 +347,11 @@ function copySourceFiles(
       return [];
     }
 
-    if (runningSize > warnThreshold && entries.length > 0 && entries.length % 50 === 0) {
+    if (forceInclude && runningSize > maxArtifactSize && entries.length > 0 && entries.length % 100 === 0) {
+      process.stderr.write(
+        `  Warning (--force-include): artifact is ${(runningSize / 1024 / 1024).toFixed(1)} MB and growing...\n`,
+      );
+    } else if (runningSize > warnThreshold && entries.length > 0 && entries.length % 50 === 0) {
       process.stderr.write(
         `  Warning: artifact is ${(runningSize / 1024 / 1024).toFixed(1)} MB and growing...\n`,
       );
