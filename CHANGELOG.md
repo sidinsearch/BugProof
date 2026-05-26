@@ -7,6 +7,22 @@ and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.4.0] - 2026-05-26 (Real-World Validation Release)
+
+### Verified
+
+- **Real GitHub projects tested**: expressjs/morgan, pallets/jinja, pallets/flask, sindresorhus/got, gorilla/mux
+- **Cross-platform replay: 100%** — Windows→Windows, Windows→Linux, Linux→Linux, Linux→Windows
+- **Real bug scenarios**: startup crashes, import errors, syntax errors, runtime failures
+- **Stress tests passed**: 100K line output (6s), 3 parallel captures (11s), 5x replay loop (5/5)
+- **Failure injection handled**: corrupted artifacts, missing files, broken git — all graceful errors
+- **All 10 commands verified**: capture, replay, inspect, diff, doctor, watch, share, pull, clean, mcp
+- **Sandbox modes**: isolated and full sandbox replay confirmed
+- **Self-heal replay**: auto-dependency installation verified
+- **494 unit tests, 0 failures**
+
+---
+
 ## [1.3.0] - 2026-05-26 (MCP Server Expansion — AI Agent Distribution)
 
 ### Added
