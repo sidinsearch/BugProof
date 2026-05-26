@@ -124,6 +124,7 @@ dummy-testing/
 validation-workspace/
 generated files/
 *.bin
+test-projects/
 
 # E2E test results (auto-generated, not tracked)
 tests/e2e/results/*.json
