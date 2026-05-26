@@ -7,6 +7,21 @@ export interface Verdict {
   message: string;
 }
 
+/**
+ * Normalize error patterns for cross-platform comparison.
+ * Only normalizes platform-specific differences (paths, line endings),
+ * preserves exception names and error codes for accurate matching.
+ */
+function normalizeForCrossPlatform(pattern: string): string {
+  return pattern
+    // Normalize Windows paths to Unix-style (D:\path → /path)
+    .replace(/([A-Za-z]):\\/g, '$1/')
+    .replace(/\\\\/g, '/')
+    // Normalize line endings
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
+
 function normalizePatterns(patterns: string[]): string[] {
   return [...new Set(patterns.map((pattern) => pattern.trim()).filter((pattern) => pattern.length > 0))].sort();
 }
@@ -64,10 +79,11 @@ export function generateVerdict(result: ReplayResult): Verdict {
     };
   }
 
-  // 2. Normalized Pattern Match
+  // 2. Normalized Pattern Match (with cross-platform normalization)
   const expectedPatterns = normalizePatterns(expectedFailure.error_patterns);
   const actualPatterns = normalizePatterns(actualFailure.error_patterns);
 
+  // Try direct pattern match first
   if (hasMatchingSignificantPatterns(expectedPatterns, actualPatterns)) {
     return {
       status: 'confirmed',
@@ -75,7 +91,19 @@ export function generateVerdict(result: ReplayResult): Verdict {
     };
   }
 
-  // 3. Different exit code, but failed
+  // 3. Cross-platform normalized pattern match
+  // Normalize both sides for path/format differences
+  const expectedNormalized = expectedPatterns.map(normalizeForCrossPlatform);
+  const actualNormalized = actualPatterns.map(normalizeForCrossPlatform);
+
+  if (hasMatchingSignificantPatterns(expectedNormalized, actualNormalized)) {
+    return {
+      status: 'confirmed',
+      message: 'Reproduction confirmed (cross-platform pattern match)'
+    };
+  }
+
+  // 4. Different exit code, but failed
   if (actualFailure.exit_code !== 0) {
     return {
       status: 'not_confirmed',
@@ -83,7 +111,7 @@ export function generateVerdict(result: ReplayResult): Verdict {
     };
   }
 
-  // 4. Succeeded
+  // 5. Succeeded
   return {
     status: 'not_confirmed',
     message: 'Command succeeded on replay. The bug did not reproduce.'

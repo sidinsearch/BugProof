@@ -56,6 +56,65 @@ export interface TranslatedEnvironment {
   translations: string[];
 }
 
+/** Available runtimes on the replay platform */
+export interface AvailableRuntimes {
+  python: string | null; // "python3", "python", "py", or null
+  node: string | null;
+  java: string | null;
+  go: string | null;
+  ruby: string | null;
+  rust: string | null;
+  dotnet: string | null;
+  gcc: string | null;
+  gpp: string | null;
+}
+
+/** Detect which runtimes are available on the current platform */
+export function detectAvailableRuntimes(): AvailableRuntimes {
+  const runtimes: AvailableRuntimes = {
+    python: null,
+    node: null,
+    java: null,
+    go: null,
+    ruby: null,
+    rust: null,
+    dotnet: null,
+    gcc: null,
+    gpp: null,
+  };
+
+  // Python: try python3, python, py (Windows)
+  for (const cmd of ['python3', 'python', 'py']) {
+    if (commandExists(cmd)) { runtimes.python = cmd; break; }
+  }
+
+  // Node.js
+  if (commandExists('node')) runtimes.node = 'node';
+
+  // Java
+  if (commandExists('java')) runtimes.java = 'java';
+
+  // Go
+  if (commandExists('go')) runtimes.go = 'go';
+
+  // Ruby
+  if (commandExists('ruby')) runtimes.ruby = 'ruby';
+
+  // Rust
+  if (commandExists('rustc')) runtimes.rust = 'rustc';
+
+  // .NET
+  if (commandExists('dotnet')) runtimes.dotnet = 'dotnet';
+
+  // GCC
+  if (commandExists('gcc')) runtimes.gcc = 'gcc';
+
+  // G++
+  if (commandExists('g++')) runtimes.gpp = 'g++';
+
+  return runtimes;
+}
+
 /**
  * Detects whether cross-platform translation is needed and assesses compatibility.
  */
@@ -113,8 +172,10 @@ export function translateCommand(
   command: string[],
   capturedPlatform: string,
   replayPlatform?: string,
+  availableRuntimes?: AvailableRuntimes,
 ): TranslatedCommand {
   const replay = replayPlatform || os.platform();
+  const runtimes = availableRuntimes || detectAvailableRuntimes();
   const translations: string[] = [];
   const blockers: string[] = [];
 
@@ -124,8 +185,8 @@ export function translateCommand(
 
   let translated = [...command];
 
-  // 1. Translate the executable
-  translated[0] = translateExecutable(translated[0], capturedPlatform, replay, translations, blockers);
+  // 1. Translate the executable with runtime-aware fallback
+  translated[0] = translateExecutableWithRuntime(translated[0], capturedPlatform, replay, translations, blockers, runtimes);
 
   // 2. Translate shell wrappers
   translated = translateShellWrapper(translated, capturedPlatform, replay, translations);
@@ -228,52 +289,59 @@ export function translateEnvironment(
 // ── Command translation helpers ──
 
 /** Common command aliases across platforms */
-const COMMAND_MAP: Record<string, Record<string, string>> = {
-  // ── Scripting languages ──
-  'python3': { win32: 'python' },
-  'python': { linux: 'python3', darwin: 'python3' },
-  'pip3': { win32: 'pip' },
-  'pip': { linux: 'pip3', darwin: 'pip3' },
+const COMMAND_MAP: Record<string, Record<string, string[]>> = {
+  // ── Scripting languages (ordered by preference) ──
+  'python3': { win32: ['py', 'python'] },
+  'python': { linux: ['python3'], darwin: ['python3'] },
+  'py': { linux: ['python3', 'python'], darwin: ['python3', 'python'] },
+  'pip3': { win32: ['pip'] },
+  'pip': { linux: ['pip3'], darwin: ['pip3'] },
   // ── Java/JVM ──
-  'gradlew': { win32: 'gradlew.bat' },
-  'gradlew.bat': { linux: './gradlew', darwin: './gradlew' },
-  './gradlew': { win32: 'gradlew.bat' },
-  'mvnw': { win32: 'mvnw.cmd' },
-  'mvnw.cmd': { linux: './mvnw', darwin: './mvnw' },
-  './mvnw': { win32: 'mvnw.cmd' },
+  'gradlew': { win32: ['gradlew.bat'] },
+  'gradlew.bat': { linux: ['./gradlew'], darwin: ['./gradlew'] },
+  './gradlew': { win32: ['gradlew.bat'] },
+  'mvnw': { win32: ['mvnw.cmd'] },
+  'mvnw.cmd': { linux: ['./mvnw'], darwin: ['./mvnw'] },
+  './mvnw': { win32: ['mvnw.cmd'] },
   // ── C/C++ build tools ──
-  'make': { win32: 'mingw32-make' },
-  'mingw32-make': { linux: 'make', darwin: 'make' },
-  'cc': { win32: 'gcc' },
-  'c++': { win32: 'g++' },
+  'make': { win32: ['mingw32-make', 'nmake'] },
+  'mingw32-make': { linux: ['make'], darwin: ['make'] },
+  'cc': { win32: ['gcc', 'clang'] },
+  'c++': { win32: ['g++', 'clang++'] },
   // ── .NET ──
-  'dotnet': { win32: 'dotnet', linux: 'dotnet', darwin: 'dotnet' },
+  'dotnet': { win32: ['dotnet'], linux: ['dotnet'], darwin: ['dotnet'] },
   // ── Utilities ──
-  'open': { win32: 'start', linux: 'xdg-open' },
-  'xdg-open': { win32: 'start', darwin: 'open' },
-  'start': { linux: 'xdg-open', darwin: 'open' },
-  'cls': { linux: 'clear', darwin: 'clear' },
-  'clear': { win32: 'cls' },
-  'cat': { win32: 'type' },
-  'ls': { win32: 'dir' },
-  'rm': { win32: 'del' },
-  'cp': { win32: 'copy' },
-  'mv': { win32: 'move' },
-  'which': { win32: 'where' },
-  'where': { linux: 'which', darwin: 'which' },
+  'open': { win32: ['start'], linux: ['xdg-open'] },
+  'xdg-open': { win32: ['start'], darwin: ['open'] },
+  'start': { linux: ['xdg-open'], darwin: ['open'] },
+  'cls': { linux: ['clear'], darwin: ['clear'] },
+  'clear': { win32: ['cls'] },
+  'cat': { win32: ['type'] },
+  'ls': { win32: ['dir'] },
+  'rm': { win32: ['del'] },
+  'cp': { win32: ['copy'] },
+  'mv': { win32: ['move'] },
+  'which': { win32: ['where'] },
+  'where': { linux: ['which'], darwin: ['which'] },
   // ── Shell ──
-  'sh': { win32: 'bash' },
+  'sh': { win32: ['bash', 'pwsh'] },
+  'bash': { win32: ['pwsh', 'cmd'] },
 };
 
 /** Binary extensions that cannot run cross-platform (reserved for future use) */
 const _NATIVE_BINARY_EXTENSIONS = ['.exe', '.dll', '.so', '.dylib', '.elf', ''];
 
-function translateExecutable(
+/**
+ * Runtime-aware executable translation.
+ * Uses detected runtimes to make smarter translation decisions.
+ */
+function translateExecutableWithRuntime(
   exe: string,
   from: string,
   to: string,
   translations: string[],
   blockers: string[],
+  runtimes: AvailableRuntimes,
 ): string {
   const baseName = path.basename(exe).replace(/\.exe$/i, '');
 
@@ -284,30 +352,71 @@ function translateExecutable(
       blockers.push(`Cannot run Windows executable '${exe}' on ${platformName(to)}. Requires Windows or Wine.`);
     }
     if (from === 'linux' && !ext && to === 'win32') {
-      // Could be a Linux ELF binary — check if it's a known scripting command
       if (!isScriptingCommand(baseName)) {
         blockers.push(`Binary '${exe}' may be a Linux ELF executable. Cannot run on Windows without WSL.`);
       }
     }
   }
 
-  // Try command map
-  const mapping = COMMAND_MAP[baseName];
-  if (mapping && mapping[to]) {
-    // Verify the target command exists
-    const exists = commandExists(mapping[to]);
-    if (exists) {
-      translations.push(`Command: ${baseName} → ${mapping[to]}`);
-      return mapping[to];
+  // Python: use detected runtime directly
+  if (baseName === 'python' || baseName === 'python3' || baseName === 'py') {
+    if (from !== to) {
+      if (runtimes.python) {
+        translations.push(`Command: ${baseName} → ${runtimes.python} (detected)`);
+        return runtimes.python;
+      }
+      // Fallback: try the standard mapping
+      const mapping = COMMAND_MAP[baseName];
+      if (mapping && mapping[to]) {
+        const candidates = Array.isArray(mapping[to]) ? mapping[to] : [mapping[to]];
+        for (const candidate of candidates) {
+          if (commandExists(candidate)) {
+            translations.push(`Command: ${baseName} → ${candidate}`);
+            return candidate;
+          }
+        }
+        const fallback = candidates[0];
+        translations.push(`Command: ${baseName} → ${fallback} (best-effort)`);
+        return fallback;
+      }
     }
+    // Same platform — no translation needed
+    return exe;
   }
 
-  // python3 → python fallback on Windows
-  if (baseName === 'python3' && to === 'win32') {
-    if (commandExists('python')) {
-      translations.push('Command: python3 → python');
-      return 'python';
+  // Node.js: always 'node' across platforms
+  if (baseName === 'node' && from !== to) {
+    if (runtimes.node) {
+      translations.push('Command: node → node (same across platforms)');
+      return 'node';
     }
+    blockers.push('Node.js is not available on the replay platform.');
+    return exe;
+  }
+
+  // Java: always 'java' across platforms
+  if ((baseName === 'java' || baseName === 'javac') && from !== to) {
+    if (runtimes.java) {
+      translations.push(`Command: ${baseName} → ${baseName} (same across platforms)`);
+      return baseName;
+    }
+    blockers.push('Java is not available on the replay platform.');
+    return exe;
+  }
+
+  // Try command map with fallback chain
+  const mapping = COMMAND_MAP[baseName];
+  if (mapping && mapping[to]) {
+    const candidates = Array.isArray(mapping[to]) ? mapping[to] : [mapping[to]];
+    for (const candidate of candidates) {
+      if (commandExists(candidate)) {
+        translations.push(`Command: ${baseName} → ${candidate}`);
+        return candidate;
+      }
+    }
+    const fallback = candidates[0];
+    translations.push(`Command: ${baseName} → ${fallback} (best-effort)`);
+    return fallback;
   }
 
   return exe;
@@ -474,7 +583,22 @@ function commandExists(name: string): boolean {
       timeout: 3000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    return result.status === 0;
+    if (result.status !== 0) return false;
+
+    // On Windows, additionally verify the command actually runs (not a Store redirect)
+    if (os.platform() === 'win32') {
+      const testResult = spawnSync(name, ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      // Store redirect returns exit code 9009 or shows "not found" message
+      if (testResult.status === 9009) return false;
+      const output = (testResult.stdout || '') + (testResult.stderr || '');
+      if (output.includes('was not found') || output.includes('Microsoft Store')) return false;
+    }
+
+    return true;
   } catch {
     return false;
   }

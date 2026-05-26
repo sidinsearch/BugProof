@@ -83,6 +83,8 @@ async function main() {
     const testCases = [
       { name: 'node-crash-error', linuxCmd: 'node index.js' },
       { name: 'node-syntax-error', linuxCmd: 'node index.js' },
+      { name: 'python-runtime-error', linuxCmd: 'python3 main.py' },
+      { name: 'python-div-zero', linuxCmd: 'python3 main.py' },
       { name: 'java-exception', linuxCmd: 'java Main.java' },
     ];
 

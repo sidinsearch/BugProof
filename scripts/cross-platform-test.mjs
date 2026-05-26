@@ -100,8 +100,8 @@ async function runTests() {
   const testCases = [
     { name: 'node-crash-error', cmd: 'node index.js' },
     { name: 'node-syntax-error', cmd: 'node index.js' },
-    { name: 'python-runtime-error', cmd: 'python3 app.py' },
-    { name: 'python-div-zero', cmd: 'python3 app.py' },
+    { name: 'python-runtime-error', cmd: 'python main.py' },
+    { name: 'python-div-zero', cmd: 'python main.py' },
     { name: 'java-exception', cmd: 'java Main.java' },
   ];
 

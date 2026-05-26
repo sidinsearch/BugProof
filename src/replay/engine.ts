@@ -3,7 +3,7 @@ import { FailureRecord } from '../types/failure.js';
 import { executeAndCapture } from '../capture/engine.js';
 import { createBugBox, BugBoxResult } from '../sandbox/bugbox.js';
 import { sanitizeArtifactEnvironment } from '../utils/security.js';
-import { detectCrossPlatform, translateCommand, translateEnvironment } from '../sandbox/cross-platform.js';
+import { detectCrossPlatform, translateCommand, translateEnvironment, detectAvailableRuntimes } from '../sandbox/cross-platform.js';
 
 export interface ReplayOptions {
   artifactPath: string;
@@ -86,12 +86,15 @@ export async function replayArtifact(
     const capturedArch = options.capturedArch || process.arch;
     const crossPlatform = detectCrossPlatform(capturedPlatform, process.platform, capturedArch, process.arch);
 
+    // Detect available runtimes on the replay platform
+    const availableRuntimes = detectAvailableRuntimes();
+
     let replayCommand = runConfig.command;
     const allTranslations: string[] = [];
     const allBlockers: string[] = [];
 
     if (crossPlatform.needsTranslation) {
-      const cmdTranslation = translateCommand(replayCommand, capturedPlatform);
+      const cmdTranslation = translateCommand(replayCommand, capturedPlatform, process.platform, availableRuntimes);
       replayCommand = cmdTranslation.command;
       allTranslations.push(...cmdTranslation.translations);
       allBlockers.push(...cmdTranslation.blockers);
