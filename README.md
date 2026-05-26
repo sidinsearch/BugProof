@@ -295,9 +295,8 @@ $ bugproof capture -- npm test
 # 4. Anyone replays it on their machine
 $ bugproof replay bug_1778049738215.bug
   ✔  REPRODUCTION CONFIRMED
-  Expected exit  1
-  Actual exit    1
-  Verdict        Reproduction confirmed (exact fingerprint match)
+  Exit code    exit 1 (match)
+  Verdict      Reproduction confirmed (exact fingerprint match)
 ```
 
 Optional flow:

@@ -7,6 +7,84 @@ and BugProof adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.2.6] - 2026-05-26 (Cross-Platform Validation Release)
+
+### Fixed
+
+- Removed unused `terminal-image` dependency from package.json (was not imported anywhere, added ~2MB to install size).
+- CHANGELOG backfilled for versions 1.2.0–1.2.5 (previously jumped from 1.1.28 to current).
+- README Quick Start example updated to match current replay verdict format (single "Exit code" line with match indicator).
+- Dead code cleanup: removed unused `icons` imports from 6 command files after banner refactor.
+- Dead code cleanup: removed unused `path`/`fs` imports from ui.ts after removing renderLogo image rendering.
+
+### Verified
+
+- 40 test suites, 483 tests, 0 failures
+- Lint clean, TypeScript strict mode passing
+- Cross-platform validation across Windows ↔ Linux
+
+---
+
+## [1.2.5] - 2026-05-20 (UI Polish Final)
+
+### Fixed
+
+- Removed unused `path`/`fs` imports from ui.ts after removing renderLogo image rendering.
+- Cleaned up unused `icons` imports from 6 command files after banner refactor.
+
+---
+
+## [1.2.4] - 2026-05-20 (Import Cleanup)
+
+### Fixed
+
+- Removed unused `icons` imports from capture, diff, doctor, inspect, keygen, and share commands after banner refactor.
+
+---
+
+## [1.2.3] - 2026-05-20 (TS1343 Fix)
+
+### Fixed
+
+- Fixed TS1343 `import.meta` error by replacing with `__dirname` fallback for ESM compatibility.
+
+---
+
+## [1.2.2] - 2026-05-20 (First-Run Welcome)
+
+### Added
+
+- First-run welcome experience: shows branded Quick Start guide on first bare `bugproof` invocation.
+- Creates `~/.bugproof-welcomed` marker file; subsequent bare invocations show help.
+
+### Changed
+
+- Postinstall script made silent (npm v7+ suppresses output); welcome moved to CLI first-run.
+
+---
+
+## [1.2.1] - 2026-05-20 (Replay Verdict Simplification)
+
+### Changed
+
+- Simplified replay verdict box: merged "Expected exit" + "Actual exit" into single "Exit code" line with `(match)` or `(expected X, got Y)` indicator.
+
+---
+
+## [1.2.0] - 2026-05-20 (Brand Color Overhaul)
+
+### Changed
+
+- Brand color changed from cyan to `#FFAA33` (amber/orange) throughout entire UI system.
+- Logo badge: dark grey text (`#2A2A2A`) on amber background.
+- All UI elements use brand color consistently: sections, spinners, progress bars, summary boxes.
+- Added `c.brand()`, `c.bgBrand()`, `c.dark()` RGB color helpers to ui.ts.
+- Removed figlet dependency entirely; replaced with styled text badge logo.
+- Removed terminal-image/renderLogo image rendering; text-only logo now.
+- Fixed duplicate "BugProof" branding in all banner calls (capture, replay, inspect, diff, doctor, etc.).
+
+---
+
 ## [1.1.28] - 2026-05-17 (Terminal UI Polish)
 
 ### Fixed
