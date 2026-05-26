@@ -186,6 +186,7 @@ export async function packageArtifact(
       options.maxArtifactSizeMB ?? 100,
       options.forceInclude ?? false,
       options.includeCompiled ?? false,
+      options.languageContext,
     );
 
     const totalSize = fileEntries.reduce((sum, f) => sum + f.size, 0);
@@ -307,6 +308,7 @@ function copySourceFiles(
   maxArtifactSizeMB = 100,
   forceInclude = false,
   includeCompiled = false,
+  languageContext?: ProjectLanguageContext,
 ): FileEntry[] {
   const maxArtifactSize = maxArtifactSizeMB * 1024 * 1024;
   const warnThreshold = maxArtifactSize;
@@ -340,8 +342,11 @@ function copySourceFiles(
     relativePaths = filterByExcludePatterns(relativePaths, excludePatterns);
   }
 
-  // Include compiled artifacts if requested
-  if (includeCompiled) {
+  // Include compiled artifacts if:
+  // 1. User explicitly requested via --include-compiled, OR
+  // 2. Auto-detected compiled language with present build artifacts
+  const shouldIncludeCompiled = includeCompiled || autoDetectCompiledLanguages(workingDir, languageContext);
+  if (shouldIncludeCompiled) {
     const compiledPaths = findCompiledArtifacts(workingDir);
     relativePaths = [...new Set([...relativePaths, ...compiledPaths])];
   }
@@ -417,13 +422,13 @@ function copySourceFiles(
 }
 
 /**
- * Find compiled language artifacts in common build directories.
+ * Find compiled language artifacts in common build directories and project root.
  */
 function findCompiledArtifacts(workingDir: string): string[] {
   const compiled: string[] = [];
   const maxIndividualSize = 50 * 1024 * 1024; // 50MB per file
 
-  function scanDir(dir: string, relativeBase: string): void {
+  function scanDir(dir: string, relativeBase: string, scanSubDirs: boolean): void {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -438,9 +443,12 @@ function findCompiledArtifacts(workingDir: string): string[] {
       if (entry.isSymbolicLink()) continue;
 
       if (entry.isDirectory()) {
-        // Scan build directories
+        // Scan build directories and their contents
         if (BUILD_DIRS.includes(name)) {
-          scanDir(path.join(dir, name), relPath);
+          scanDir(path.join(dir, name), relPath, true);
+        } else if (scanSubDirs) {
+          // Recurse into subdirectories of build dirs
+          scanDir(path.join(dir, name), relPath, true);
         }
       } else if (entry.isFile()) {
         const ext = path.extname(name).toLowerCase();
@@ -458,6 +466,52 @@ function findCompiledArtifacts(workingDir: string): string[] {
     }
   }
 
-  scanDir(workingDir, '');
+  // Scan project root for compiled files alongside source
+  scanDir(workingDir, '', false);
+
+  // Scan build directories recursively
+  for (const buildDir of BUILD_DIRS) {
+    const dirPath = path.join(workingDir, buildDir);
+    if (fs.existsSync(dirPath)) {
+      scanDir(dirPath, buildDir, true);
+    }
+  }
+
   return compiled;
+}
+
+/**
+ * Auto-detect if the project uses compiled languages and has build artifacts present.
+ * Returns true if compiled artifacts should be included automatically.
+ *
+ * Supported compiled languages (auto-detected):
+ * - Java: .java source + target/, build/, out/ with .class/.jar files
+ * - Python: .py source + __pycache__/ with .pyc/.pyo files
+ * - Go: go.mod + bin/, dist/ with compiled binaries (detected by extension)
+ * - Rust: Cargo.toml + target/ with compiled binaries
+ * - .NET/C#: .csproj/.sln + bin/, obj/ with .dll/.exe files
+ * - WebAssembly: .wasm files in any build directory
+ * - Node native addons: .node files in build/, dist/, node_modules/
+ *
+ * NOT auto-included (platform-specific binaries, source-only replay):
+ * - C/C++: .o, .obj, .exe — these are platform-specific and won't replay cross-platform
+ * - Swift, Kotlin/Native, etc.
+ */
+function autoDetectCompiledLanguages(workingDir: string, languageContext?: ProjectLanguageContext): boolean {
+  if (!languageContext || languageContext.languages.length === 0) {
+    return findCompiledArtifacts(workingDir).length > 0;
+  }
+
+  const compiledLanguageIds = new Set(['java', 'python', 'go', 'rust', 'dotnet', 'typescript']);
+  const hasCompiledLanguage = languageContext.languages.some(lang => compiledLanguageIds.has(lang.id));
+
+  if (!hasCompiledLanguage) {
+    const wasmOrNode = findCompiledArtifacts(workingDir).some(p =>
+      p.endsWith('.wasm') || p.endsWith('.node')
+    );
+    return wasmOrNode;
+  }
+
+  const compiledArtifacts = findCompiledArtifacts(workingDir);
+  return compiledArtifacts.length > 0;
 }

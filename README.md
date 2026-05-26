@@ -364,6 +364,7 @@ bugproof capture -o ./bugs/ -- npm test
 bugproof capture --include-untracked -- python app.py
 bugproof capture -x "*.log" -x "node_modules/**" -- go test ./...
 bugproof capture --timeout 600000 -- java -cp . Main
+bugproof capture --include-compiled -- mvn test    # force include .class/.jar files
 bugproof capture --sign --signer "alice@example.com" -- ./run.sh
 bugproof capture --json -- node script.js
 ```
@@ -375,6 +376,7 @@ bugproof capture --json -- node script.js
 | `-o, --output <dir>` | Output directory (default: current directory; respects `.bugproofrc` `outputDir`) |
 | `-x, --exclude <pattern>` | Exclude files by glob (repeatable) |
 | `--include-untracked` | Bundle untracked files too (`git ls-files -o`) |
+| `--include-compiled` | Force include compiled artifacts (`.class`, `.jar`, `.pyc`, etc.) — auto-detected by default |
 | `--timeout <ms>` | Kill the command after N ms (default 300000) |
 | `--skip-secrets` | Don't scan env for secrets (skip the confirm prompt) |
 | `--sign [key]` | Sign with the default key, or a named key / path to a `.key` file |
@@ -508,10 +510,29 @@ BugProof keeps artifacts small even on heavy codebases:
 |---|---|---|---|
 | `git-full` | Clean git repo | Commit ref only | ~2 KB |
 | `git-patch` | Dirty git repo | Commit ref + diff patch | ~5 KB |
-| `stacktrace` | No git repo | Files mentioned in the stacktrace | ~10–50 KB |
-| `minimal` | No git, no stacktrace | Command + env only | ~1 KB |
+| `git-files` | Force mode / untracked | All tracked + untracked files | varies |
+| `full-copy` | No git repo | Full codebase (excl. node_modules, etc.) | ~10–100 MB |
 
 Git is **strongly encouraged** but not required.
+
+### Compiled Language Support
+
+BugProof **auto-detects** compiled languages and bundles build artifacts automatically:
+
+| Language | Source Files | Compiled Artifacts | Auto-Included? |
+|---|---|---|---|
+| **Java** | `.java` | `.class`, `.jar`, `.war`, `.ear` | ✅ Yes (from `target/`, `build/`, `out/`) |
+| **Python** | `.py` | `.pyc`, `.pyo` | ✅ Yes (from `__pycache__/`) |
+| **Go** | `.go` | `bin/`, compiled binaries | ✅ Yes (from `bin/`, `dist/`) |
+| **Rust** | `.rs` | `target/` binaries | ✅ Yes (from `target/`) |
+| **.NET/C#** | `.cs`, `.csproj` | `.dll`, `.exe` | ✅ Yes (from `bin/`, `obj/`) |
+| **WebAssembly** | — | `.wasm` | ✅ Yes (from any build dir) |
+| **Node native** | — | `.node` | ✅ Yes (from `build/`, `dist/`) |
+| **C/C++** | `.c`, `.cpp` | `.o`, `.obj`, `.exe` | ❌ No (platform-specific, source-only) |
+
+**How it works:** When BugProof detects a compiled language project (via `pom.xml`, `go.mod`, `Cargo.toml`, etc.) and finds compiled artifacts in standard build directories, it automatically includes them. No flag needed.
+
+Use `--include-compiled` to force inclusion even when auto-detection misses something, or for edge cases.
 
 ---
 
@@ -620,7 +641,7 @@ bugproof/
 |---|---|
 | `capture/engine.ts` | Execute the user's command, stream output to temp files, record stdout/stderr/exit |
 | `capture/packager.ts` | Bundle into `.bug` zip; optionally sign with Ed25519 |
-| `capture/language-support.ts` | Detect Node/Python/Java/Go/Rust/.NET/C++/Kotlin |
+| `capture/language-support.ts` | Detect Node/Python/Java/Go/Rust/.NET/C++/Kotlin + compiled artifact auto-detection |
 | `capture/env-snapshot.ts` | Record runtime versions for environment diff on replay |
 | `capture/source-strategy.ts` | Smart source selection: git-full, git-patch, stacktrace, minimal |
 | `replay/engine.ts` | Reproduce the command in a sandbox |

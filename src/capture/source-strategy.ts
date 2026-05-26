@@ -75,7 +75,6 @@ const SKIP_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg',
   '.mp3', '.mp4', '.avi', '.mov', '.woff', '.woff2', '.ttf',
   '.eot', '.pdf', '.psd', '.ai', '.sketch',
-  '.pyc', '.pyo', '.wasm', '.node',
 ]);
 
 /** Compiled language artifact extensions that SHOULD be included for replay */
