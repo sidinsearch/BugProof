@@ -34,9 +34,9 @@ export function mapToReplayEnvironment(originalPath: string, tempReplayRoot: str
     // Strip the drive letter and colon (e.g., "D:\" -> "")
     const pathWithoutRoot = originalPath.slice(2);
     // Normalize to forward slashes for cross-platform consistency
-    // Explicitly replace both forward and backward slashes with forward slashes
     const normalized = pathWithoutRoot.replace(/\\/g, '/').replace(/\/+/g, '/');
-    return path.posix.join(tempReplayRoot, normalized);
+    // Use path.join (not path.posix.join) since tempReplayRoot is platform-native
+    return path.join(tempReplayRoot, normalized.replace(/\//g, path.sep));
   }
   
   // Handle Unix absolute paths

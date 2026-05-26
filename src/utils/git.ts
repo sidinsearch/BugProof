@@ -1,4 +1,6 @@
 import { spawnSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface GitContext {
   commit: string | undefined;
@@ -51,4 +53,48 @@ export function getGitContext(cwd: string): GitContext {
   }
 
   return ctx;
+}
+
+/**
+ * Checks if a file is tracked by git.
+ */
+function isFileTracked(filePath: string, cwd: string): boolean {
+  const result = spawnSync('git', ['ls-files', '--error-unmatch', filePath], {
+    cwd,
+    encoding: 'utf-8',
+    timeout: 5000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return result.status === 0;
+}
+
+/**
+ * Finds files referenced in command tokens that exist on disk but aren't tracked by git.
+ * Returns a list of untracked file paths referenced by the command.
+ */
+export function findUntrackedCommandFiles(commandTokens: string[], cwd: string): string[] {
+  const untrackedFiles: string[] = [];
+  const seen = new Set<string>();
+
+  for (const token of commandTokens) {
+    // Skip flags and options
+    if (token.startsWith('-')) continue;
+
+    // Check if token looks like a file path
+    const filePath = path.resolve(cwd, token);
+    if (!fs.existsSync(filePath)) continue;
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) continue;
+
+    // Normalize to relative path for git check
+    const relativePath = path.relative(cwd, filePath);
+    if (seen.has(relativePath)) continue;
+    seen.add(relativePath);
+
+    if (!isFileTracked(relativePath, cwd)) {
+      untrackedFiles.push(relativePath);
+    }
+  }
+
+  return untrackedFiles;
 }

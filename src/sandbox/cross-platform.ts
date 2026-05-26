@@ -296,6 +296,11 @@ const COMMAND_MAP: Record<string, Record<string, string[]>> = {
   'py': { linux: ['python3', 'python'], darwin: ['python3', 'python'] },
   'pip3': { win32: ['pip'] },
   'pip': { linux: ['pip3'], darwin: ['pip3'] },
+  // ── Package managers (Windows .cmd wrappers via cmd.exe) ──
+  'npm': { win32: ['cmd', '/c', 'npm'] },
+  'npx': { win32: ['cmd', '/c', 'npx'] },
+  'yarn': { win32: ['cmd', '/c', 'yarn'] },
+  'pnpm': { win32: ['cmd', '/c', 'pnpm'] },
   // ── Java/JVM ──
   'gradlew': { win32: ['gradlew.bat'] },
   'gradlew.bat': { linux: ['./gradlew'], darwin: ['./gradlew'] },
@@ -514,16 +519,22 @@ function translatePathValue(value: string, from: string, to: string): string {
   if (from !== 'win32' && to === 'win32') {
     let result = value;
     const loweredValue = value.toLowerCase();
+    let matchedKnown = false;
     for (const [pattern, replacement] of Object.entries(UNIX_TO_WIN_KNOWN_PATHS)) {
       if (loweredValue.includes(pattern)) {
         const idx = loweredValue.indexOf(pattern);
         result = result.slice(0, idx) + replacement + result.slice(idx + pattern.length);
+        matchedKnown = true;
         break;
       }
     }
     result = result.replace(/\//g, '\\');
-    if (result.startsWith('\\')) {
-      result = 'C:' + result;
+    // Only add C: prefix if the path starts with backslash AND we matched a known pattern
+    // (which already includes a drive letter in the replacement)
+    // For unmapped paths, leave as-is to avoid creating non-existent paths
+    if (!matchedKnown && result.startsWith('\\')) {
+      // Unmapped absolute path — return as relative to avoid silent ENOENT
+      result = result.replace(/^\\+/, '');
     }
     return result;
   }

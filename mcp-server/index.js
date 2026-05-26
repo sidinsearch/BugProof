@@ -28,12 +28,12 @@
  *   doctor    — Check sandbox capabilities
  */
 
-import { spawnSync } from 'child_process';
-import { createRequire } from 'module';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
 const _require = createRequire(import.meta.url);
 
-let cliPath: string;
+let cliPath;
 try {
   cliPath = _require.resolve('bugproof/dist/cli.js');
 } catch {
@@ -42,7 +42,6 @@ try {
     env: { ...process.env },
   });
   process.exit(result.status ?? 1);
-  throw new Error('unreachable');
 }
 
 const result = spawnSync(process.execPath, [cliPath, 'mcp'], {

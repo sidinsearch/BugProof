@@ -14,9 +14,18 @@ export interface Verdict {
  */
 function normalizeForCrossPlatform(pattern: string): string {
   return pattern
-    // Normalize Windows paths to Unix-style (D:\path → /path)
-    .replace(/([A-Za-z]):\\/g, '$1/')
+    // Normalize Windows paths: C:\path → /path
+    .replace(/([A-Za-z]):\\/g, '/')
     .replace(/\\\\/g, '/')
+    // Normalize all backslashes to forward slashes
+    .replace(/\\/g, '/')
+    // Collapse multiple slashes
+    .replace(/\/+/g, '/')
+    // Normalize common home directory patterns to a canonical form
+    // Windows: /Users/name → /home/name
+    .replace(/\/Users\/([^/]+)/gi, '/home/$1')
+    // Strip drive-letter remnants like /C/ at start
+    .replace(/^\/[A-Za-z](?=\/)/, '')
     // Normalize line endings
     .replace(/\r\n/g, '\n')
     .trim();

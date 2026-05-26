@@ -120,8 +120,18 @@ TROUBLESHOOTING.md
 # --------------------------------------------------------------------
 dummy-project/
 dummy-testing/
+validation-workspace/
 generated files/
 *.bin
+
+# E2E test results (auto-generated, not tracked)
+tests/e2e/results/*.json
+
+# Build artifacts in test fixtures
+tests/fixtures/**/.gradle/
+tests/fixtures/**/build/
+tests/fixtures/**/bin/
+tests/fixtures/**/target/
 
 # --------------------------------------------------------------------
 # 7. OS & IDE

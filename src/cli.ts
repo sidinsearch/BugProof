@@ -77,6 +77,7 @@ program
   .name('bugproof')
   .description('Executable bug artifacts \u2014 portable, reproducible bug reports')
   .version(VERSION)
+  .enablePositionalOptions()
   .addHelpText('beforeAll', () => {
     helpBanner();
     return '';

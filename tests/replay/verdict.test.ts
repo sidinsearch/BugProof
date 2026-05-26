@@ -198,4 +198,87 @@ describe('Verdict Generator', () => {
     expect(verdict.status).toBe('not_confirmed');
     expect(verdict.message).toContain('succeeded on replay');
   });
+
+  it('should confirm cross-platform match: Linux paths vs Windows paths', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:linux-capture',
+      error_patterns: [
+        "Error: Cannot find module '/home/user/project/src/index.js'",
+        'MODULE_NOT_FOUND',
+      ],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:windows-replay',
+      error_patterns: [
+        "Error: Cannot find module 'C:\\Users\\user\\project\\src\\index.js'",
+        'MODULE_NOT_FOUND',
+      ],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('confirmed');
+  });
+
+  it('should confirm cross-platform match: Windows paths vs Linux paths', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:windows-capture',
+      error_patterns: [
+        "Error: ENOENT: no such file, open 'C:\\Users\\user\\project\\config.json'",
+      ],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:linux-replay',
+      error_patterns: [
+        "Error: ENOENT: no such file, open '/home/user/project/config.json'",
+      ],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('confirmed');
+  });
+
+  it('should normalize line endings in cross-platform comparison', () => {
+    const expectedFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:unix-eol',
+      error_patterns: [
+        "Error at line 10\n  at module.js:42",
+      ],
+    };
+    const actualFailure = {
+      ...baseFailure,
+      fingerprint: 'sha256:windows-eol',
+      error_patterns: [
+        "Error at line 10\r\n  at module.js:42",
+      ],
+    };
+
+    const verdict = generateVerdict({
+      expectedFailure,
+      actualFailure,
+      actualStdout: '',
+      actualStderr: '',
+      replayDirectory: process.cwd(),
+    });
+
+    expect(verdict.status).toBe('confirmed');
+  });
 });

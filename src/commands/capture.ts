@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import { executeAndCapture } from '../capture/engine.js';
 import { packageArtifact, buildCaptureManifest, buildCaptureMetadata } from '../capture/packager.js';
 import { scanEnvironmentForSecrets, buildEnvironmentSchema } from '../utils/secrets.js';
-import { getGitContext } from '../utils/git.js';
+import { getGitContext, findUntrackedCommandFiles } from '../utils/git.js';
 import { getBugProofVersion } from '../utils/version.js';
 import { formatCaptureJson } from '../utils/json-output.js';
 import { RunConfig } from '../types/artifact.js';
@@ -27,6 +27,7 @@ const VERSION = getBugProofVersion();
 export const captureCommand = new Command('capture')
   .description('Capture a failing command as a .bug artifact')
   .allowUnknownOption(true)
+  .passThroughOptions()
   .option('--include-untracked', 'Include untracked files (git ls-files -o)')
   .option('--skip-secrets', "Don't scan for secrets; skip confirmation")
   .option('--timeout <ms>', 'Command timeout in milliseconds', '300000')
@@ -45,7 +46,21 @@ export const captureCommand = new Command('capture')
   .action(async (commandTokens: string[], options) => {
     const jsonMode = options.json === true;
 
-    if (!commandTokens || commandTokens.length === 0) {
+    // Fix: manually extract command tokens after '--' to avoid flag collision
+    // (e.g., 'gcc -o output input.c' where -o would be parsed as --output)
+    const rawArgs = process.argv.slice(3); // skip 'node', 'cli.js', 'capture'
+    const dashDashIndex = rawArgs.indexOf('--');
+    let effectiveCommandTokens = commandTokens;
+    let outputOverriddenByCommand = false;
+    if (dashDashIndex >= 0) {
+      effectiveCommandTokens = rawArgs.slice(dashDashIndex + 1);
+      // If -o/--output appeared after '--', it was part of the captured command, not a BugProof option
+      // Check if any -o/--output tokens exist after '--'
+      const afterDashDash = rawArgs.slice(dashDashIndex + 1);
+      outputOverriddenByCommand = afterDashDash.some(arg => arg === '-o' || arg.startsWith('--output'));
+    }
+
+    if (!effectiveCommandTokens || effectiveCommandTokens.length === 0) {
       if (jsonMode) {
         console.log(JSON.stringify({ success: false, error: 'No command provided' }));
       } else {
@@ -59,7 +74,8 @@ export const captureCommand = new Command('capture')
     const config = loadConfig(process.cwd());
 
     // Resolve output directory: flag > config.outputDir > current directory
-    const outputDir = options.output
+    // If -o appeared after '--', it was part of the captured command — ignore it
+    const outputDir = (options.output && !outputOverriddenByCommand)
       ? path.resolve(options.output)
       : path.resolve(config.outputDir);
 
@@ -95,15 +111,15 @@ export const captureCommand = new Command('capture')
     const langContext = detectProjectLanguages(process.cwd());
 
     // 3. Execute command
-    let effectiveCommand = commandTokens;
+    let effectiveCommand = effectiveCommandTokens;
     let containerCleanup = () => {};
 
     if (options.container) {
       if (!jsonMode) {
-        info(`Running in BugBox container: ${c.bold(commandTokens.join(' '))}`);
+        info(`Running in BugBox container: ${c.bold(effectiveCommandTokens.join(' '))}`);
       }
       const container = createContainer({
-        command: commandTokens,
+        command: effectiveCommandTokens,
         workingDir: process.cwd(),
         environment: process.env as Record<string, string>,
         timeoutMs: parseInt(options.timeout, 10),
@@ -119,7 +135,7 @@ export const captureCommand = new Command('capture')
         }
       }
     } else if (!jsonMode) {
-      info(`Running: ${c.bold(commandTokens.join(' '))}`);
+      info(`Running: ${c.bold(effectiveCommandTokens.join(' '))}`);
     }
 
     if (!jsonMode) console.log();
@@ -160,7 +176,7 @@ export const captureCommand = new Command('capture')
       // Use config template if it's customized
       artifactName = applyNameTemplate(config.nameTemplate, {
         timestamp: Date.now(),
-        command: commandTokens[0] || 'unknown',
+        command: effectiveCommandTokens[0] || 'unknown',
         exit_code: result.failure.exit_code,
       }).replace(/[^a-zA-Z0-9_-]/g, '_');
     } else {
@@ -169,8 +185,8 @@ export const captureCommand = new Command('capture')
 
     const manifest = buildCaptureManifest({
       name: artifactName,
-      description: options.description || `Captured failure: ${commandTokens.join(' ')}`,
-      command: commandTokens,
+      description: options.description || `Captured failure: ${effectiveCommandTokens.join(' ')}`,
+      command: effectiveCommandTokens,
       workingDirectory: runConfig.working_directory,
       exitCode: result.failure.exit_code,
       durationMs: result.failure.duration_ms,
@@ -213,6 +229,15 @@ export const captureCommand = new Command('capture')
     if (!jsonMode) {
       console.log();
       info(`Source: ${c.dim(sourceStrategy.reason)}`);
+    }
+
+    // 5b. Warn about untracked files referenced in the command
+    if (git.commit && git.dirty && !options.includeUntracked && !jsonMode) {
+      const untrackedFiles = findUntrackedCommandFiles(effectiveCommandTokens, process.cwd());
+      if (untrackedFiles.length > 0) {
+        warn(`Command references untracked file(s): ${untrackedFiles.join(', ')}`);
+        info(`Replay may fail unless these files are present. Use ${c.cyan('--include-untracked')} to bundle them.`);
+      }
     }
 
     // 6. Package artifact

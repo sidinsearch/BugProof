@@ -462,4 +462,27 @@ describe('cross-platform edge cases', () => {
     const userResult = translateCommand(['cat', 'C:\\Users\\alice\\doc.txt'], 'win32', 'linux');
     expect(userResult.command[1]).toMatch(/^\/home\/alice\/doc\.txt$/i);
   });
+
+  // Regression: unmapped Linux paths should NOT get C: prefix blindly added
+  it('Linux→Win: unmapped paths should not get C: prefix', () => {
+    const result = translateCommand(['ls', '/data/projects/my_app'], 'linux', 'win32');
+    const p = result.command[1];
+    expect(p).not.toMatch(/^C:/);
+    expect(p).toContain('data');
+    expect(p).toContain('projects');
+    expect(p).toContain('my_app');
+  });
+
+  it('Linux→Win: known paths still get proper Windows translation', () => {
+    const result = translateCommand(['node', '/home/user/app.js'], 'linux', 'win32');
+    const p = result.command[1];
+    expect(p).toMatch(/^C:\\Users\\/);
+  });
+
+  it('Linux→Win: relative paths should not get C: prefix', () => {
+    const result = translateCommand(['node', './src/app.js'], 'linux', 'win32');
+    const p = result.command[1];
+    expect(p).not.toMatch(/^C:/);
+    expect(p).toBe('.\\src\\app.js');
+  });
 });
