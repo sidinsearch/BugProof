@@ -150,26 +150,99 @@ export const captureCommand = new Command('capture')
     let containerCleanup = () => {};
 
     // Auto-detect unexecutable file types and prepend the appropriate runtime
-    // This ensures .py/.rb/.pl files are captured with their interpreter, not as bare filenames
+    // This ensures script files are captured with their interpreter, not as bare filenames
+    // Covers all interpreted/scripting languages that aren't directly executable via spawn()
     const autoPrependRuntime = (command: string[]): string[] => {
       if (command.length === 0) return command;
       const first = command[0];
       const lower = first.toLowerCase();
-      const isPathLike = first.includes('/') || first.includes('\\');
-      // .py files are not directly executable via spawn() without shebang + chmod
-      if (lower.endsWith('.py') && !isPathLike) {
-        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-        return [pythonCmd, ...command];
-      }
-      // .rb files
-      if (lower.endsWith('.rb') && !isPathLike) {
-        return ['ruby', ...command];
-      }
-      // .pl files
-      if (lower.endsWith('.pl') && !isPathLike) {
-        return ['perl', ...command];
-      }
-      return command;
+      const ext = lower.match(/\.[a-z0-9]+$/)?.[0] || '';
+      const isWindows = process.platform === 'win32';
+
+      // Returns [interpreter, ...optionalArgs] for the given extension
+      // Format: { ext: { unix: [...], win: [...] } }
+      // If win is omitted, unix is used for both platforms
+      const interpreters: Record<string, { unix: string[]; win?: string[] }> = {
+        // Python
+        '.py': { unix: ['python3'], win: ['python'] },
+        // Ruby
+        '.rb': { unix: ['ruby'] },
+        // Perl / Raku
+        '.pl': { unix: ['perl'] },
+        '.pm': { unix: ['perl'] },
+        '.raku': { unix: ['raku'] },
+        '.rakumod': { unix: ['raku'] },
+        // PHP
+        '.php': { unix: ['php'] },
+        // Lua
+        '.lua': { unix: ['lua'] },
+        // R
+        '.r': { unix: ['Rscript'] },
+        // PowerShell
+        '.ps1': { unix: ['pwsh'], win: ['powershell'] },
+        '.psm1': { unix: ['pwsh'], win: ['powershell'] },
+        '.psd1': { unix: ['pwsh'], win: ['powershell'] },
+        // Shell / Bash
+        '.sh': { unix: ['bash'], win: ['bash'] },
+        '.bash': { unix: ['bash'] },
+        '.zsh': { unix: ['zsh'] },
+        '.fish': { unix: ['fish'] },
+        // JavaScript / TypeScript
+        '.js': { unix: ['node'] },
+        '.mjs': { unix: ['node'] },
+        '.cjs': { unix: ['node'] },
+        '.ts': { unix: ['ts-node'] },
+        '.mts': { unix: ['ts-node'] },
+        '.cts': { unix: ['ts-node'] },
+        '.tsx': { unix: ['ts-node'] },
+        // CoffeeScript
+        '.coffee': { unix: ['coffee'] },
+        '.litcoffee': { unix: ['coffee'] },
+        // Elixir
+        '.exs': { unix: ['elixir'] },
+        '.ex': { unix: ['elixir'] },
+        // Julia
+        '.jl': { unix: ['julia'] },
+        // Groovy
+        '.groovy': { unix: ['groovy'] },
+        '.gvy': { unix: ['groovy'] },
+        // Tcl
+        '.tcl': { unix: ['tclsh'] },
+        '.tk': { unix: ['wish'] },
+        // Scheme / Lisp
+        '.scm': { unix: ['guile'] },
+        '.ss': { unix: ['guile'] },
+        '.rkt': { unix: ['racket'] },
+        '.clj': { unix: ['clojure'] },
+        '.cljs': { unix: ['clojure'] },
+        // Haskell
+        '.hs': { unix: ['runhaskell'] },
+        '.lhs': { unix: ['runhaskell'] },
+        // OCaml
+        '.ml': { unix: ['ocaml'] },
+        '.mli': { unix: ['ocaml'] },
+        // F# scripts
+        '.fsx': { unix: ['dotnet', 'fsi'] },
+        '.fsi': { unix: ['dotnet', 'fsi'] },
+        // Swift
+        '.swift': { unix: ['swift'] },
+        // Nim (interpreter mode)
+        '.nim': { unix: ['nim', 'r'] },
+        // Crystal (run mode)
+        '.cr': { unix: ['crystal', 'run'] },
+        // Zig (run mode)
+        '.zig': { unix: ['zig', 'run'] },
+        // V (run mode)
+        '.v': { unix: ['v', 'run'] },
+        // D (interpreted mode)
+        '.d': { unix: ['rdmd'] },
+      };
+
+      const entry = interpreters[ext];
+      if (!entry) return command;
+
+      const cmd = isWindows && entry.win ? entry.win : entry.unix;
+      return [...cmd, ...command];
     };
     effectiveCommand = autoPrependRuntime(effectiveCommand);
 
