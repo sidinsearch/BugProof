@@ -353,9 +353,14 @@ function translateExecutableWithRuntime(
   // Strip .exe extension when translating from Windows to Linux/macOS
   if (from === 'win32' && to !== 'win32' && exe.toLowerCase().endsWith('.exe')) {
     const stripped = exe.replace(/\.exe$/i, '');
-    translations.push(`Executable: ${exe} → ${stripped} (stripped .exe for Unix)`);
-    // Continue processing with the stripped name
-    return translateExecutableWithRuntime(stripped, from, to, translations, blockers, runtimes);
+    // Check if the stripped name is a known cross-platform command
+    if (isScriptingCommand(stripped)) {
+      translations.push(`Executable: ${exe} → ${stripped} (stripped .exe for Unix)`);
+      return translateExecutableWithRuntime(stripped, from, to, translations, blockers, runtimes);
+    }
+    // Unknown .exe — flag as blocker
+    blockers.push(`Cannot run Windows executable '${exe}' on ${platformName(to)}. Requires Windows or Wine.`);
+    return stripped;
   }
 
   // Check for native binaries

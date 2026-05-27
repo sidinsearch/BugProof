@@ -632,7 +632,7 @@ bugproof/
 │   ├── config/           # .bugproofrc loader and validation
 │   ├── utils/            # signing, secrets, fingerprint, dependencies, security, …
 │   └── cli.ts            # Commander entrypoint (14 commands)
-├── tests/                # 40 suites / 483 tests (Jest)
+├── tests/                # 40 suites / 502 tests (Jest)
 ├── scripts/              # Postinstall, e2e matrix, file-association helpers
 └── .github/workflows/    # CI/CD (tri-platform matrix, signed npm publish)
 ```
