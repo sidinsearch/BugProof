@@ -304,7 +304,7 @@ export function table(headers: string[], rows: string[][], colWidths?: number[])
   }
 }
 
-/** Summary box for final output — flexible width, wraps long text */
+/** Summary box for final output — heavy/double borders, wraps long text */
 export function summaryBox(title: string, items: { label: string; value: string; highlight?: boolean }[]): void {
   if (items.length === 0) return;
   const width = getTerminalWidth();
@@ -326,15 +326,17 @@ export function summaryBox(title: string, items: { label: string; value: string;
   const valueColWidth = boxInnerWidth - labelPad;
 
   console.log();
-  const topLine = '\u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510';
+
+  // Heavy box: ┏ ━ ┓ ┃ ┣ ┫ ┗ ┛
+  const topLine = '\u250F' + '\u2501'.repeat(boxInnerWidth) + '\u2513';
   console.log(brand(c.bold('  ' + topLine)));
 
   // Title row
   const titlePadded = ' ' + title + ' '.repeat(Math.max(0, boxInnerWidth - title.length - 1));
-  console.log(brand(c.bold('  \u2502' + titlePadded + '\u2502')));
+  console.log(brand(c.bold('  \u2503' + titlePadded + '\u2503')));
 
-  // Separator
-  const sepLine = '\u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524';
+  // Separator: ┣━━━...━━━┫
+  const sepLine = '\u2523' + '\u2501'.repeat(boxInnerWidth) + '\u252B';
   console.log(brand(c.bold('  ' + sepLine)));
 
   // Content rows
@@ -358,12 +360,12 @@ export function summaryBox(title: string, items: { label: string; value: string;
 
       const visibleLen = stripAnsi(lineContent).length;
       const padding = ' '.repeat(Math.max(0, boxInnerWidth - visibleLen));
-      console.log(brand(c.bold('  \u2502')) + lineContent + padding + brand(c.bold('\u2502')));
+      console.log(brand(c.bold('  \u2503')) + lineContent + padding + brand(c.bold('\u2503')));
     }
   }
 
-  // Bottom line
-  const bottomLine = '\u2514' + '\u2501'.repeat(boxInnerWidth) + '\u2518';
+  // Bottom line: ┗━━━...━━━┛
+  const bottomLine = '\u2517' + '\u2501'.repeat(boxInnerWidth) + '\u251B';
   console.log(brand(c.bold('  ' + bottomLine)));
   console.log();
 }
