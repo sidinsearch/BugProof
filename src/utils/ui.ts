@@ -315,9 +315,9 @@ export function summaryBox(title: string, items: { label: string; value: string;
   const boxOverhead = 8;
   const maxContentWidth = width - boxOverhead;
 
-  // Calculate minimum width needed: label column + longest value (wrapped)
+  // Calculate minimum width needed: leading space + label column + longest value
   const maxRawValue = Math.max(...items.map(i => stripAnsi(i.value).length));
-  const minContentWidth = labelPad + maxRawValue;
+  const minContentWidth = 1 + labelPad + maxRawValue;
 
   // Box inner width: cap at terminal width, but at least as wide as the longest single-line item
   const boxInnerWidth = Math.min(maxContentWidth, Math.max(minContentWidth, title.length + 4));
