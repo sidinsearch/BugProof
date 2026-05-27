@@ -304,39 +304,88 @@ export function table(headers: string[], rows: string[][], colWidths?: number[])
   }
 }
 
-/** Summary box for final output — fixed alignment and truncation */
+/** Summary box for final output — flexible width, wraps long text */
 export function summaryBox(title: string, items: { label: string; value: string; highlight?: boolean }[]): void {
   if (items.length === 0) return;
   const width = getTerminalWidth();
   const maxLabel = Math.max(...items.map(i => stripAnsi(i.label).length));
   const labelPad = maxLabel + 2;
 
-  // Calculate available width for values
-  const borderChars = 4; // left border + space + space + right border
-  const maxValWidth = width - borderChars - labelPad;
+  // Box margins: "  " (2) + left border (1) + space (1) + content + space (1) + right border (1) + "  " (2) = 8 chars overhead
+  const boxOverhead = 8;
+  const maxContentWidth = width - boxOverhead;
+
+  // Calculate minimum width needed: label column + longest value (wrapped)
+  const maxRawValue = Math.max(...items.map(i => stripAnsi(i.value).length));
+  const minContentWidth = labelPad + maxRawValue;
+
+  // Box inner width: cap at terminal width, but at least as wide as the longest single-line item
+  const boxInnerWidth = Math.min(maxContentWidth, Math.max(minContentWidth, title.length + 4));
+
+  // Value column width for wrapping
+  const valueColWidth = boxInnerWidth - labelPad;
 
   console.log();
-  const boxInnerWidth = labelPad + Math.min(maxValWidth, 60);
+  const topLine = '\u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510';
+  console.log(brand(c.bold('  ' + topLine)));
 
-console.log(brand(c.bold('  \u250C' + '\u2501'.repeat(boxInnerWidth) + '\u2510')));
-console.log(brand(c.bold('  \u2502')) + brand(c.bold(' ' + title + ' '.repeat(boxInnerWidth - title.length - 1))) + brand(c.bold('\u2502')));
-console.log(brand(c.bold('  \u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524')));
+  // Title row
+  const titlePadded = ' ' + title + ' '.repeat(Math.max(0, boxInnerWidth - title.length - 1));
+  console.log(brand(c.bold('  \u2502' + titlePadded + '\u2502')));
+
+  // Separator
+  const sepLine = '\u251C' + '\u2500'.repeat(boxInnerWidth) + '\u2524';
+  console.log(brand(c.bold('  ' + sepLine)));
+
+  // Content rows
   for (const item of items) {
     const label = item.highlight ? c.bold(brand(item.label)) : c.dim(item.label);
     const paddedLabel = label + ' '.repeat(Math.max(0, maxLabel - stripAnsi(item.label).length + 2));
 
-    // Truncate value if too long, accounting for ANSI codes
-    const rawValue = stripAnsi(item.value);
-    let displayValue = item.value;
-    if (rawValue.length > maxValWidth && maxValWidth > 6) {
-      displayValue = item.value.slice(0, maxValWidth - 3) + c.dim('...');
-    }
+    // Wrap value into multiple lines if needed
+    const wrappedLines = wrapValue(item.value, valueColWidth);
 
-    const lineContent = ` ${paddedLabel}${displayValue}`;
-console.log(brand(c.bold('  \u2502')) + lineContent + ' '.repeat(Math.max(0, boxInnerWidth - stripAnsi(lineContent).length)) + brand(c.bold('\u2502')));
-}
-console.log(brand(c.bold('  \u2514' + '\u2501'.repeat(boxInnerWidth) + '\u2518')));
+    for (let i = 0; i < wrappedLines.length; i++) {
+      const valueLine = wrappedLines[i];
+      let lineContent: string;
+      if (i === 0) {
+        // First line: label + value
+        lineContent = ` ${paddedLabel}${valueLine}`;
+      } else {
+        // Continuation lines: indent to align with value column
+        lineContent = ` ${' '.repeat(maxLabel + 2)}${valueLine}`;
+      }
+
+      const visibleLen = stripAnsi(lineContent).length;
+      const padding = ' '.repeat(Math.max(0, boxInnerWidth - visibleLen));
+      console.log(brand(c.bold('  \u2502')) + lineContent + padding + brand(c.bold('\u2502')));
+    }
+  }
+
+  // Bottom line
+  const bottomLine = '\u2514' + '\u2501'.repeat(boxInnerWidth) + '\u2518';
+  console.log(brand(c.bold('  ' + bottomLine)));
   console.log();
+}
+
+/**
+ * Wraps a value string (which may contain ANSI codes) into multiple lines
+ * of at most `maxWidth` visible characters each.
+ * Preserves ANSI codes — they are carried forward to continuation lines.
+ */
+function wrapValue(value: string, maxWidth: number): string[] {
+  if (maxWidth <= 0) return [value];
+  const visible = stripAnsi(value);
+  if (visible.length <= maxWidth) return [value];
+
+  const lines: string[] = [];
+  let pos = 0;
+  while (pos < visible.length) {
+    const end = Math.min(pos + maxWidth, visible.length);
+    lines.push(visible.slice(pos, end));
+    pos = end;
+  }
+  return lines;
 }
 
 /** Strip ANSI escape codes from a string for length calculation */
