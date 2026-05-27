@@ -52,10 +52,11 @@ export const captureCommand = new Command('capture')
     const allArgs = process.argv.slice(3); // skip 'node', 'cli.js', 'capture'
     
     // Known BugProof flags (with and without values)
+    // Note: -o and -x are excluded to avoid conflicts with common CLI tool flags
     const flagValues = new Map<string, number>([
       ['--timeout', 1], ['--name', 1], ['-n', 1],
-      ['--description', 1], ['-d', 1], ['--output', 1], ['-o', 1],
-      ['--exclude', 1], ['-x', 1], ['--sign', 1], ['--signer', 1],
+      ['--description', 1], ['-d', 1], ['--output', 1],
+      ['--exclude', 1], ['--sign', 1], ['--signer', 1],
     ]);
     const knownFlags = new Set([
       ...flagValues.keys(),
