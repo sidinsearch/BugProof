@@ -149,6 +149,30 @@ export const captureCommand = new Command('capture')
     let effectiveCommand = effectiveCommandTokens;
     let containerCleanup = () => {};
 
+    // Auto-detect unexecutable file types and prepend the appropriate runtime
+    // This ensures .py/.rb/.pl files are captured with their interpreter, not as bare filenames
+    const autoPrependRuntime = (command: string[]): string[] => {
+      if (command.length === 0) return command;
+      const first = command[0];
+      const lower = first.toLowerCase();
+      const isPathLike = first.includes('/') || first.includes('\\');
+      // .py files are not directly executable via spawn() without shebang + chmod
+      if (lower.endsWith('.py') && !isPathLike) {
+        const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+        return [pythonCmd, ...command];
+      }
+      // .rb files
+      if (lower.endsWith('.rb') && !isPathLike) {
+        return ['ruby', ...command];
+      }
+      // .pl files
+      if (lower.endsWith('.pl') && !isPathLike) {
+        return ['perl', ...command];
+      }
+      return command;
+    };
+    effectiveCommand = autoPrependRuntime(effectiveCommand);
+
     if (options.container) {
       if (!jsonMode) {
         info(`Running in BugBox container: ${c.bold(effectiveCommandTokens.join(' '))}`);
@@ -170,7 +194,7 @@ export const captureCommand = new Command('capture')
         }
       }
     } else if (!jsonMode) {
-      info(`Running: ${c.bold(effectiveCommandTokens.join(' '))}`);
+      info(`Running: ${c.bold(effectiveCommand.join(' '))}`);
     }
 
     if (!jsonMode) console.log();
@@ -220,8 +244,8 @@ export const captureCommand = new Command('capture')
 
     const manifest = buildCaptureManifest({
       name: artifactName,
-      description: options.description || `Captured failure: ${effectiveCommandTokens.join(' ')}`,
-      command: effectiveCommandTokens,
+      description: options.description || `Captured failure: ${effectiveCommand.join(' ')}`,
+      command: effectiveCommand,
       workingDirectory: runConfig.working_directory,
       exitCode: result.failure.exit_code,
       durationMs: result.failure.duration_ms,
