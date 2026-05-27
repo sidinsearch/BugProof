@@ -30,6 +30,16 @@ const COMPILED_EXTENSIONS = new Set([
   '.node',     // Node.js native addons
 ]);
 
+/** Native binary extensions (C/C++) — only included when --include-compiled is explicit */
+const NATIVE_BINARY_EXTENSIONS = new Set([
+  '.exe',      // Windows executables
+  '.dll',      // Windows dynamic libraries
+  '.so',       // Linux shared objects
+  '.dylib',    // macOS dynamic libraries
+  '.o',        // Object files
+  '.obj',      // Windows object files
+]);
+
 /** Common build directories to scan for compiled artifacts */
 const BUILD_DIRS = [
   'target',        // Maven/Gradle
@@ -345,9 +355,9 @@ function copySourceFiles(
   // Include compiled artifacts if:
   // 1. User explicitly requested via --include-compiled, OR
   // 2. Auto-detected compiled language with present build artifacts
-  const shouldIncludeCompiled = includeCompiled || autoDetectCompiledLanguages(workingDir, languageContext);
+  const shouldIncludeCompiled = includeCompiled || autoDetectCompiledLanguages(workingDir, languageContext, includeCompiled);
   if (shouldIncludeCompiled) {
-    const compiledPaths = findCompiledArtifacts(workingDir);
+    const compiledPaths = findCompiledArtifacts(workingDir, includeCompiled);
     relativePaths = [...new Set([...relativePaths, ...compiledPaths])];
   }
 
@@ -424,9 +434,10 @@ function copySourceFiles(
 /**
  * Find compiled language artifacts in common build directories and project root.
  */
-function findCompiledArtifacts(workingDir: string): string[] {
+function findCompiledArtifacts(workingDir: string, includeNative = false): string[] {
   const compiled: string[] = [];
   const maxIndividualSize = 50 * 1024 * 1024; // 50MB per file
+  const allExtensions = new Set([...COMPILED_EXTENSIONS, ...(includeNative ? NATIVE_BINARY_EXTENSIONS : [])]);
 
   function scanDir(dir: string, relativeBase: string, scanSubDirs: boolean): void {
     let entries: fs.Dirent[];
@@ -452,7 +463,7 @@ function findCompiledArtifacts(workingDir: string): string[] {
         }
       } else if (entry.isFile()) {
         const ext = path.extname(name).toLowerCase();
-        if (COMPILED_EXTENSIONS.has(ext)) {
+        if (allExtensions.has(ext)) {
           try {
             const stat = fs.statSync(path.join(dir, name));
             if (stat.size <= maxIndividualSize) {
@@ -493,25 +504,24 @@ function findCompiledArtifacts(workingDir: string): string[] {
  * - WebAssembly: .wasm files in any build directory
  * - Node native addons: .node files in build/, dist/, node_modules/
  *
- * NOT auto-included (platform-specific binaries, source-only replay):
- * - C/C++: .o, .obj, .exe — these are platform-specific and won't replay cross-platform
- * - Swift, Kotlin/Native, etc.
+ * When includeCompiled is true (user passed --include-compiled), C/C++ binaries
+ * (.exe, .dll, .so, .dylib, .o, .obj) are also included.
  */
-function autoDetectCompiledLanguages(workingDir: string, languageContext?: ProjectLanguageContext): boolean {
+function autoDetectCompiledLanguages(workingDir: string, languageContext?: ProjectLanguageContext, includeCompiled = false): boolean {
   if (!languageContext || languageContext.languages.length === 0) {
-    return findCompiledArtifacts(workingDir).length > 0;
+    return findCompiledArtifacts(workingDir, includeCompiled).length > 0;
   }
 
   const compiledLanguageIds = new Set(['java', 'python', 'go', 'rust', 'dotnet', 'typescript']);
   const hasCompiledLanguage = languageContext.languages.some(lang => compiledLanguageIds.has(lang.id));
 
   if (!hasCompiledLanguage) {
-    const wasmOrNode = findCompiledArtifacts(workingDir).some(p =>
+    const wasmOrNode = findCompiledArtifacts(workingDir, includeCompiled).some(p =>
       p.endsWith('.wasm') || p.endsWith('.node')
     );
     return wasmOrNode;
   }
 
-  const compiledArtifacts = findCompiledArtifacts(workingDir);
+  const compiledArtifacts = findCompiledArtifacts(workingDir, includeCompiled);
   return compiledArtifacts.length > 0;
 }

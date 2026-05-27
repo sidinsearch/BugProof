@@ -110,10 +110,12 @@ export async function executeAndCapture(config: RunConfig): Promise<CaptureResul
     };
 
     try {
+      // Batch files require shell execution on Windows
+      const isBatchFile = /\.(bat|cmd)$/i.test(command);
       proc = spawn(command, args, {
         cwd: config.working_directory,
         env: config.environment,
-        shell: false,
+        shell: isBatchFile,
         detached: process.platform !== 'win32'
       });
     } catch (err) {

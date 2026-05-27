@@ -350,6 +350,14 @@ function translateExecutableWithRuntime(
 ): string {
   const baseName = path.basename(exe).replace(/\.exe$/i, '');
 
+  // Strip .exe extension when translating from Windows to Linux/macOS
+  if (from === 'win32' && to !== 'win32' && exe.toLowerCase().endsWith('.exe')) {
+    const stripped = exe.replace(/\.exe$/i, '');
+    translations.push(`Executable: ${exe} → ${stripped} (stripped .exe for Unix)`);
+    // Continue processing with the stripped name
+    return translateExecutableWithRuntime(stripped, from, to, translations, blockers, runtimes);
+  }
+
   // Check for native binaries
   const ext = path.extname(exe).toLowerCase();
   if (from !== to) {

@@ -242,6 +242,21 @@ function detectPython(workingDir: string): DetectionResult | null {
 
 // ── Java / Kotlin ──
 
+/** Read Java .class file bytecode version (bytes 6-7, big-endian). Returns null if not a valid class file. */
+function getJavaClassFileVersion(classFilePath: string): number | null {
+  try {
+    const buffer = fs.readFileSync(classFilePath);
+    if (buffer.length < 8 || buffer[0] !== 0xCA || buffer[1] !== 0xFE) return null;
+    return (buffer[6] << 8) | buffer[7];
+  } catch { return null; }
+}
+
+/** Map JVM class file version to JDK major version */
+function classVersionToJdkMajor(classVersion: number): number | null {
+  const map: Record<number, number> = { 45: 1, 46: 2, 47: 3, 48: 4, 49: 5, 50: 6, 51: 7, 52: 8, 53: 9, 54: 10, 55: 11, 56: 12, 57: 13, 58: 14, 59: 15, 60: 16, 61: 17, 62: 18, 63: 19, 64: 20, 65: 21, 66: 22, 67: 23 };
+  return map[classVersion] ?? null;
+}
+
 function detectJava(workingDir: string): DetectionResult | null {
   const hasMaven = fs.existsSync(path.join(workingDir, 'pom.xml'));
   const hasGradle = fs.existsSync(path.join(workingDir, 'build.gradle'))
@@ -286,8 +301,31 @@ function detectJava(workingDir: string): DetectionResult | null {
     }
   }
 
+  // Bytecode version detection from .class files
+  const bytecodeVersion = detectBytecodeVersion(workingDir);
+  if (bytecodeVersion) {
+    const jdkMajor = classVersionToJdkMajor(bytecodeVersion);
+    if (jdkMajor) {
+      warnings.push(`Bytecode version ${bytecodeVersion} (JDK ${jdkMajor}) detected in .class files. Replay system must have JDK ${jdkMajor}+.`);
+      if (javaVersion) {
+        const runtimeMajor = parseInt(javaVersion.split('.')[0], 10);
+        if (runtimeMajor < jdkMajor) {
+          warnings.push(`Runtime JDK ${runtimeMajor} is older than bytecode JDK ${jdkMajor}. This will cause UnsupportedClassVersionError.`);
+        }
+      }
+    }
+  }
+
   warnings.push('Java is cross-platform (JVM), but build tool wrappers (gradlew/mvnw) differ per OS.');
   warnings.push('Ensure JAVA_HOME is set correctly on the replay system.');
+
+  const notes: string[] = [
+    'JVM bytecode is cross-platform. Build wrappers handle OS differences.',
+    'JDK version must match (major version). gradlew/mvnw handle build tool versioning.',
+  ];
+  if (bytecodeVersion) {
+    notes.push(`Bytecode version: ${bytecodeVersion}${classVersionToJdkMajor(bytecodeVersion) ? ` (JDK ${classVersionToJdkMajor(bytecodeVersion)})` : ''}`);
+  }
 
   return {
     language: {
@@ -299,15 +337,37 @@ function detectJava(workingDir: string): DetectionResult | null {
       lockfile: null,
       needsBuild: true,
       crossPlatform: 'high',
-      notes: [
-        'JVM bytecode is cross-platform. Build wrappers handle OS differences.',
-        'JDK version must match (major version). gradlew/mvnw handle build tool versioning.',
-      ],
+      notes,
     },
     buildCommands,
     criticalFiles,
     warnings,
   };
+}
+
+/** Scan for .class files and return the bytecode version of the first one found */
+function detectBytecodeVersion(workingDir: string): number | null {
+  function scanDir(dir: string, depth: number): number | null {
+    if (depth > 10) return null;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.class')) {
+        const version = getJavaClassFileVersion(path.join(dir, entry.name));
+        if (version) return version;
+      }
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        const result = scanDir(path.join(dir, entry.name), depth + 1);
+        if (result) return result;
+      }
+    }
+    return null;
+  }
+  return scanDir(workingDir, 0);
 }
 
 // ── C / C++ ──
