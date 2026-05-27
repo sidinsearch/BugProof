@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { spawnSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { executeAndCapture } from '../capture/engine.js';
@@ -358,18 +359,48 @@ export const captureCommand = new Command('capture')
       process.exit(1);
     }
 
+    // Auto-bundle untracked files referenced in the command
+    // This ensures replay works even without --include-untracked
+    const commandReferencedFiles = findUntrackedCommandFiles(effectiveCommand, process.cwd());
+    if (commandReferencedFiles.length > 0) {
+      // For git-full or git-patch strategies, we need to switch to git-files mode
+      // and include ALL tracked files plus the untracked command-referenced files
+      if (sourceStrategy.strategy === 'git-full' || sourceStrategy.strategy === 'git-patch') {
+        // Get all tracked files from git
+        const trackedResult = spawnSync('git', ['ls-files'], {
+          cwd: process.cwd(),
+          encoding: 'utf-8',
+          timeout: 5000,
+        });
+        if (trackedResult.status === 0) {
+          const trackedFiles = trackedResult.stdout.split('\n').map((f: string) => f.trim()).filter((f: string) => f.length > 0);
+          // Combine tracked files with untracked command-referenced files
+          sourceStrategy.filesToInclude = [...new Set([...trackedFiles, ...commandReferencedFiles])];
+          sourceStrategy.strategy = 'git-files';
+          sourceStrategy.reason = `Git repo with untracked command files (${commandReferencedFiles.join(', ')}). Shipping all tracked files + required untracked files.`;
+        } else {
+          // Git ls-files failed, just add the untracked files
+          for (const file of commandReferencedFiles) {
+            if (!sourceStrategy.filesToInclude.includes(file)) {
+              sourceStrategy.filesToInclude.push(file);
+            }
+          }
+          sourceStrategy.strategy = 'git-files';
+          sourceStrategy.reason = `Git repo with untracked command files (${commandReferencedFiles.join(', ')}). Shipping commit ref + required files.`;
+        }
+      } else {
+        // Already in git-files or full-copy mode, just add the untracked files
+        for (const file of commandReferencedFiles) {
+          if (!sourceStrategy.filesToInclude.includes(file)) {
+            sourceStrategy.filesToInclude.push(file);
+          }
+        }
+      }
+    }
+
     if (!jsonMode) {
       console.log();
       info(`Source: ${c.dim(sourceStrategy.reason)}`);
-    }
-
-    // 5b. Warn about untracked files referenced in the command
-    if (git.commit && git.dirty && !options.includeUntracked && !jsonMode) {
-      const untrackedFiles = findUntrackedCommandFiles(effectiveCommandTokens, process.cwd());
-      if (untrackedFiles.length > 0) {
-        warn(`Command references untracked file(s): ${untrackedFiles.join(', ')}`);
-        info(`Replay may fail unless these files are present. Use ${c.cyan('--include-untracked')} to bundle them.`);
-      }
     }
 
     // 6. Package artifact

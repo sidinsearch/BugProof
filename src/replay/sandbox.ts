@@ -96,6 +96,12 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
       const worktreeResult = tryGitWorktree(repoDir, tempDir, ref);
 
       if (worktreeResult.success) {
+        // Overlay any extra files from the artifact that aren't in git
+        // (e.g., untracked files referenced in the captured command)
+        const artifactFilesDir = path.join(options.artifactPath, 'files');
+        if (fs.existsSync(artifactFilesDir)) {
+          overlayArtifactFiles(artifactFilesDir, tempDir);
+        }
         return {
           workingDirectory: tempDir,
           tempDir,
@@ -108,6 +114,11 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
       if (options.mode === 'strict') {
         const cloneResult = tryGitCloneAndCheckout(repoDir, tempDir, ref);
         if (cloneResult.success) {
+          // Overlay any extra files from the artifact that aren't in git
+          const artifactFilesDir = path.join(options.artifactPath, 'files');
+          if (fs.existsSync(artifactFilesDir)) {
+            overlayArtifactFiles(artifactFilesDir, tempDir);
+          }
           return {
             workingDirectory: tempDir,
             tempDir,
@@ -128,6 +139,11 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
       // Current directory is a different git repo — try it
       const currentWorktree = tryGitWorktree(currentDirRepo, tempDir, ref);
       if (currentWorktree.success) {
+        // Overlay any extra files from the artifact that aren't in git
+        const artifactFilesDir = path.join(options.artifactPath, 'files');
+        if (fs.existsSync(artifactFilesDir)) {
+          overlayArtifactFiles(artifactFilesDir, tempDir);
+        }
         return {
           workingDirectory: tempDir,
           tempDir,
@@ -140,6 +156,11 @@ export async function createSandbox(options: SandboxOptions): Promise<SandboxRes
 
       const currentClone = tryGitCloneAndCheckout(currentDirRepo, tempDir, ref);
       if (currentClone.success) {
+        // Overlay any extra files from the artifact that aren't in git
+        const artifactFilesDir = path.join(options.artifactPath, 'files');
+        if (fs.existsSync(artifactFilesDir)) {
+          overlayArtifactFiles(artifactFilesDir, tempDir);
+        }
         return {
           workingDirectory: tempDir,
           tempDir,
@@ -309,6 +330,34 @@ function copyDirRecursive(src: string, dest: string): void {
       copyDirRecursive(srcPath, destPath);
     } else if (entry.isFile()) {
       fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+/**
+ * Overlay artifact files into a git worktree/clone.
+ * Copies files from the artifact's files/ directory that don't already
+ * exist in the target directory. This ensures untracked files bundled
+ * during capture are present during replay.
+ */
+function overlayArtifactFiles(artifactFilesDir: string, targetDir: string): void {
+  if (!fs.existsSync(artifactFilesDir)) return;
+
+  const entries = fs.readdirSync(artifactFilesDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) continue;
+
+    const srcPath = path.join(artifactFilesDir, entry.name);
+    const destPath = path.join(targetDir, entry.name);
+
+    // Only copy if the file doesn't already exist in the worktree
+    if (!fs.existsSync(destPath)) {
+      if (entry.isDirectory()) {
+        copyDirRecursive(srcPath, destPath);
+      } else if (entry.isFile()) {
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.copyFileSync(srcPath, destPath);
+      }
     }
   }
 }
