@@ -322,8 +322,8 @@ export function summaryBox(title: string, items: { label: string; value: string;
   // Box inner width: cap at terminal width, but at least as wide as the longest single-line item
   const boxInnerWidth = Math.min(maxContentWidth, Math.max(minContentWidth, title.length + 4));
 
-  // Value column width for wrapping
-  const valueColWidth = boxInnerWidth - labelPad;
+  // Value column width for wrapping (subtract 1 for the leading space in lineContent)
+  const valueColWidth = boxInnerWidth - labelPad - 1;
 
   console.log();
 
