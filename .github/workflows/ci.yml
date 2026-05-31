@@ -491,13 +491,14 @@ jobs:
 
       # Publish to GitHub Packages (pkgs/npm/bugproof) so the GitHub Packages
       # page shows the latest version. Uses GITHUB_TOKEN (built-in, no secret needed).
-      # GitHub Packages requires the package name to match the repo name (case-insensitive).
       - name: Publish to GitHub Packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           echo "Publishing bugproof@${VERSION} to GitHub Packages..."
+          # Configure npm to use GitHub Packages registry with auth token
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
           npm publish --registry https://npm.pkg.github.com --ignore-scripts
           echo "::notice::Published bugproof@${VERSION} to GitHub Packages"
 
