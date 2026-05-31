@@ -489,26 +489,6 @@ jobs:
             echo "::notice::Published bugproof@${VERSION} to npmjs.org (no provenance: private repo)"
           fi
 
-      # Publish to GitHub Packages as a mirror. GitHub Packages requires scoped
-      # package names for npm, so we temporarily rename to @sidinsearch/bugproof
-      # for this publish only. The scoped package appears at pkgs/npm/bugproof
-      # on GitHub (scope is stripped from the URL). npmjs.org keeps the unscoped
-      # name so `npm install -g bugproof` continues to work.
-      - name: Publish to GitHub Packages (mirror)
-        if: success()
-        continue-on-error: true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          echo "Publishing bugproof@${VERSION} to GitHub Packages as @sidinsearch/bugproof..."
-          # Temporarily scope the package name for GitHub Packages
-          jq '.name = "@sidinsearch/bugproof"' package.json > package.tmp && mv package.tmp package.json
-          # Configure npm auth for GitHub Packages
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-          npm publish --registry https://npm.pkg.github.com --ignore-scripts
-          echo "::notice::Published @sidinsearch/bugproof@${VERSION} to GitHub Packages (mirror)"
-
       # Use `gh release create` CLI (pre-installed on all GitHub runners) instead
       # of a third-party action. This eliminates the last Node.js deprecation
       # warning — gh CLI is a native Go binary with no Node runtime dependency.
