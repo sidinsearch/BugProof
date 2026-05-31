@@ -15,6 +15,13 @@ Capture a failing command into a portable `.bug` artifact that anyone can replay
 
 </div>
 
+<div align="center" style="max-width:720px;margin:24px auto 0;">
+  <a href="https://vimeo.com/1197136689" target="_blank">
+    <img src="https://vumbnail.com/1197136689.jpg" alt="Watch the BugProof product video" style="width:100%;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.3);" />
+  </a>
+  <p style="margin-top:8px;font-size:14px;color:#666;">▶ Watch the BugProof product video on Vimeo</p>
+</div>
+
 ---
 
 ## Why BugProof
