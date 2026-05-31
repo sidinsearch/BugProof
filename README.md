@@ -15,9 +15,10 @@ Capture a failing command into a portable `.bug` artifact that anyone can replay
 
 </div>
 
-<div align="center" style="max-width:720px;margin:24px auto 0;">
-  <video src="https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/BugProof-Video.mov" controls autoplay loop muted playsinline style="width:100%;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.3);"></video>
-  <p style="margin-top:8px;font-size:14px;color:#666;">▶ BugProof product demo</p>
+
+https://github.com/user-attachments/assets/2315cfee-3ccf-40d7-830e-3a3d23731ab8
+
+
 </div>
 
 ---
