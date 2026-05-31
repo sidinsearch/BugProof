@@ -1,74 +1,74 @@
 {
-    "$schema":  "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-    "name":  "io.github.sidinsearch/bugproof",
-    "title":  "BugProof",
-    "description":  "Capture, replay, and debug failures with portable, executable bug artifacts",
-                          "version": "1.6.0",
-    "websiteUrl":  "https://github.com/sidinsearch/BugProof",
-    "repository":  {
-                       "url":  "https://github.com/sidinsearch/BugProof",
-                       "source":  "github"
-                   },
-    "icons":  [
-                  {
-                      "src":  "https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png",
-                      "mimeType":  "image/png",
-                      "sizes":  [
-                                    "512x512"
-                                ],
-                      "theme":  "dark"
-                  }
-              ],
-    "tools":  [
-                  {
-                      "name":  "capture",
-                      "description":  "Run a command and capture its output as a .bug artifact"
-                  },
-                  {
-                      "name":  "replay",
-                      "description":  "Replay a .bug file and return the reproduction verdict"
-                  },
-                  {
-                      "name":  "inspect",
-                      "description":  "Show metadata for a .bug artifact without replaying"
-                  },
-                  {
-                      "name":  "diff",
-                      "description":  "Compare two .bug artifacts to find differences"
-                  },
-                  {
-                      "name":  "doctor",
-                      "description":  "Check if bugproof sandbox capabilities are available"
-                  },
-                  {
-                      "name":  "share",
-                      "description":  "Share a .bug artifact via GitHub Gist and get a shareable URL"
-                  },
-                  {
-                      "name":  "pull",
-                      "description":  "Download a .bug artifact from a GitHub Gist URL or ID"
-                  },
-                  {
-                      "name":  "watch",
-                      "description":  "Run a command and auto-capture a .bug artifact only if it fails"
-                  },
-                  {
-                      "name":  "list",
-                      "description":  "List .bug artifacts in a directory"
-                  },
-                  {
-                      "name":  "clean",
-                      "description":  "Remove .bug artifacts from a directory"
-                  }
-              ],
-    "packages":  [
-                     {
-                         "registryType":  "npm",
-                         "identifier":  "bugproof",
-    "version": "1.6.0",
-                         "transport":  {
-                                           "type":  "stdio"
-                                       }
-                     }
-                 ]
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sidinsearch/bugproof",
+  "title": "BugProof",
+  "description": "Capture, replay, and debug failures with portable, executable bug artifacts",
+  "version": "1.6.1",
+  "websiteUrl": "https://github.com/sidinsearch/BugProof",
+  "repository": {
+    "url": "https://github.com/sidinsearch/BugProof",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/sidinsearch/BugProof/main/assets/icon-512x512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ],
+      "theme": "dark"
+    }
+  ],
+  "tools": [
+    {
+      "name": "capture",
+      "description": "Run a command and capture its output as a .bug artifact"
+    },
+    {
+      "name": "replay",
+      "description": "Replay a .bug file and return the reproduction verdict"
+    },
+    {
+      "name": "inspect",
+      "description": "Show metadata for a .bug artifact without replaying"
+    },
+    {
+      "name": "diff",
+      "description": "Compare two .bug artifacts to find differences"
+    },
+    {
+      "name": "doctor",
+      "description": "Check if bugproof sandbox capabilities are available"
+    },
+    {
+      "name": "share",
+      "description": "Share a .bug artifact via GitHub Gist and get a shareable URL"
+    },
+    {
+      "name": "pull",
+      "description": "Download a .bug artifact from a GitHub Gist URL or ID"
+    },
+    {
+      "name": "watch",
+      "description": "Run a command and auto-capture a .bug artifact only if it fails"
+    },
+    {
+      "name": "list",
+      "description": "List .bug artifacts in a directory"
+    },
+    {
+      "name": "clean",
+      "description": "Remove .bug artifacts from a directory"
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "bugproof",
+      "version": "1.6.1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
 }
