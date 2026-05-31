@@ -489,19 +489,6 @@ jobs:
             echo "::notice::Published bugproof@${VERSION} to npmjs.org (no provenance: private repo)"
           fi
 
-      # Publish to GitHub Packages (pkgs/npm/bugproof) so the GitHub Packages
-      # page shows the latest version. Uses GITHUB_TOKEN (built-in, no secret needed).
-      - name: Publish to GitHub Packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          echo "Publishing bugproof@${VERSION} to GitHub Packages..."
-          # Configure npm to use GitHub Packages registry with auth token
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-          npm publish --registry https://npm.pkg.github.com --ignore-scripts
-          echo "::notice::Published bugproof@${VERSION} to GitHub Packages"
-
       # Use `gh release create` CLI (pre-installed on all GitHub runners) instead
       # of a third-party action. This eliminates the last Node.js deprecation
       # warning — gh CLI is a native Go binary with no Node runtime dependency.
