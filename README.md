@@ -15,11 +15,9 @@ Capture a failing command into a portable `.bug` artifact that anyone can replay
 
 </div>
 
-
 https://github.com/user-attachments/assets/2315cfee-3ccf-40d7-830e-3a3d23731ab8
 
-
-</div>
+---
 
 ---
 
