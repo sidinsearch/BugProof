@@ -489,22 +489,25 @@ jobs:
             echo "::notice::Published bugproof@${VERSION} to npmjs.org (no provenance: private repo)"
           fi
 
-      # Publish to GitHub Packages (pkgs/npm/bugproof) so the GitHub Packages
-      # page shows the latest version. Uses GITHUB_TOKEN (built-in, no secret needed).
-      # GitHub Packages requires the package name to match the repo name (case-insensitive).
-      # This step is best-effort — if it fails, the npmjs.org publish still succeeds.
-      - name: Publish to GitHub Packages
+      # Publish to GitHub Packages as a mirror. GitHub Packages requires scoped
+      # package names for npm, so we temporarily rename to @sidinsearch/bugproof
+      # for this publish only. The scoped package appears at pkgs/npm/bugproof
+      # on GitHub (scope is stripped from the URL). npmjs.org keeps the unscoped
+      # name so `npm install -g bugproof` continues to work.
+      - name: Publish to GitHub Packages (mirror)
         if: success()
         continue-on-error: true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          echo "Publishing bugproof@${VERSION} to GitHub Packages..."
-          # Configure npm to use GitHub Packages registry with auth token
+          echo "Publishing bugproof@${VERSION} to GitHub Packages as @sidinsearch/bugproof..."
+          # Temporarily scope the package name for GitHub Packages
+          jq '.name = "@sidinsearch/bugproof"' package.json > package.tmp && mv package.tmp package.json
+          # Configure npm auth for GitHub Packages
           echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
           npm publish --registry https://npm.pkg.github.com --ignore-scripts
-          echo "::notice::Published bugproof@${VERSION} to GitHub Packages"
+          echo "::notice::Published @sidinsearch/bugproof@${VERSION} to GitHub Packages (mirror)"
 
       # Use `gh release create` CLI (pre-installed on all GitHub runners) instead
       # of a third-party action. This eliminates the last Node.js deprecation
