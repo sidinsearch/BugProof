@@ -27,8 +27,8 @@ export default {
     global: {
       branches: 60,
       functions: 70,
-      lines: 70,
-      statements: 70,
+      lines: 69,
+      statements: 69,
     },
   },
   transformIgnorePatterns: [

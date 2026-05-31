@@ -78,7 +78,7 @@ const SKIP_EXTENSIONS = new Set([
 ]);
 
 /** Compiled language artifact extensions that SHOULD be included for replay */
-const COMPILED_ARTIFACT_EXTENSIONS = new Set([
+const _COMPILED_ARTIFACT_EXTENSIONS = new Set([
   '.class',    // Java
   '.jar',      // Java archives
   '.war',      // Java web archives
