@@ -1,7 +1,7 @@
 {
   "name": "bugproof",
   "mcpName": "io.github.sidinsearch/bugproof",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Executable bug artifacts — portable, reproducible bug reports",
   "main": "dist/cli.js",
   "type": "module",
